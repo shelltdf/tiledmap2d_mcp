@@ -15,4 +15,4 @@
 
 ## 与物理阶段关系
 
-可执行与文件格式规格以 `ai-software-engineering/02-physical/tilemap-editor-vue/spec.md` 为准。
+可执行与文件格式规格以 `ai-software-engineering/02-physical/tiledmap2d/spec.md` 为准。

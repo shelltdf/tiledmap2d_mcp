@@ -7,4 +7,4 @@
 
 ## 文档权威
 
-字段、版本号与兼容性见 `02-physical/tilemap-editor-vue/spec.md`。
+字段、版本号与兼容性见 `02-physical/tiledmap2d/spec.md`。

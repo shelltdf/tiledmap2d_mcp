@@ -3,11 +3,11 @@
 ## 仓库结构
 
 - AI 工程文档：`ai-software-engineering/`（与实现分离）。
-- 实现：`tilemap-editor-vue/`（Vue 3 + Vite）。
+- 实现：`tiledmap2d/`（Vue 3 + Vite）。
 
 ## 依赖
 
-- Node.js 与 npm；安装：`npm install`（在 `tilemap-editor-vue` 下）。
+- Node.js 与 npm；安装：`npm install`（在 `tiledmap2d` 下）。
 
 ## 脚本入口
 
@@ -21,4 +21,4 @@
 
 ## 规格权威
 
-行为与 JSON 格式以 `ai-software-engineering/02-physical/tilemap-editor-vue/spec.md` 为准。
+行为与 JSON 格式以 `ai-software-engineering/02-physical/tiledmap2d/spec.md` 为准。

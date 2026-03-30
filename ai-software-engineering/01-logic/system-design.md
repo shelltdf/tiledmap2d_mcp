@@ -17,4 +17,4 @@
 
 ## 与概念/物理一致性
 
-地图 JSON 与错误语义以 `02-physical/tilemap-editor-vue/spec.md` 为单一事实来源。
+地图 JSON 与错误语义以 `02-physical/tiledmap2d/spec.md` 为单一事实来源。

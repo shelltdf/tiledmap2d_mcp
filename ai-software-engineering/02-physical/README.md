@@ -2,4 +2,4 @@
 
 | target-id | 产物类型 | 说明 |
 |-----------|----------|------|
-| [tilemap-editor-vue](tilemap-editor-vue/) | 静态 Web（Vite 构建） | Vue 3 瓦片地图编辑器 SPA |
+| [tiledmap2d](tiledmap2d/) | 静态 Web（Vite 构建） | TiledMap2D：二维网格地图编辑器 SPA（非 GIS 地球瓦片） |
