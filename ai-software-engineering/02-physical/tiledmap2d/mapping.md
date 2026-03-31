@@ -13,10 +13,14 @@
 | **块库 Dock** | `tiledmap2d/src/components/TilePalette.vue` |
 | **块定义 Dock** | `tiledmap2d/src/components/BlockDefinitionDock.vue` |
 | 主工具栏（新建/地图设置/导入导出） | `tiledmap2d/src/components/WinToolbar.vue` |
-| 主菜单 | `tiledmap2d/src/components/WinMenuBar.vue` |
+| 主菜单（文件/编辑/语言/主题/帮助） | `tiledmap2d/src/components/WinMenuBar.vue` |
 | 帮助：文件格式说明对话框 | `tiledmap2d/src/components/FormatsHelpDialog.vue` |
-| 状态栏 | `tiledmap2d/src/components/WinStatusBar.vue` |
-| Windows 主题 | `tiledmap2d/src/styles/win-theme.css` |
+| 状态栏（点击打开 Log） | `tiledmap2d/src/components/WinStatusBar.vue` |
+| Log 窗口 | `tiledmap2d/src/components/LogDialog.vue` |
+| 应用日志 | `tiledmap2d/src/composables/useAppLog.js` |
+| 界面语言 | `tiledmap2d/src/composables/useAppI18n.js`、`tiledmap2d/src/i18n/messages.js`、`tiledmap2d/src/i18n/te.js` |
+| 主题（跟随系统/浅/深） | `tiledmap2d/src/composables/useAppTheme.js` |
+| Windows 主题（含 `html[data-theme="dark"]`） | `tiledmap2d/src/styles/win-theme.css` |
 | 应用壳 | `tiledmap2d/src/App.vue` |
 | TMX 导入导出 | `tiledmap2d/src/utils/tmx.js` |
 | Tiled 调色板图块（可选） | `tiledmap2d/public/tilemap-palette.png` |

@@ -22,3 +22,13 @@
 ## 规格权威
 
 行为与 JSON 格式以 `ai-software-engineering/02-physical/tiledmap2d/spec.md` 为准。
+
+## 第三方依赖许可证
+
+- 仓库根目录 **`THIRD_PARTY_LICENSES.md`**：由 `license-checker` 生成并人工复核的依赖许可摘要。
+- 在 `tiledmap2d` 下可执行 `npm run licenses` 重新生成 JSON 输出（用于与文档对照）；更新依赖后应复核 `THIRD_PARTY_LICENSES.md` 与 `.cursor/rules/third-party-licenses.mdc` 约定。
+
+## 国际化与主题（实现路径）
+
+- 文案：`tiledmap2d/src/i18n/messages.js`；模板内用 `te('key')`（`tiledmap2d/src/i18n/te.js`）或 `useAppI18n` 的 `appLocale`。
+- 主题：`useAppTheme.js` 写入 `html[data-theme]`，样式见 `win-theme.css`。
