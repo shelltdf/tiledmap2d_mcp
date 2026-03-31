@@ -1,5 +1,6 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { messages } from '../i18n/messages.js'
+import { appLocale } from '../i18n/appLocale.js'
 
 const LOCALE_KEY = 'tiledmap2d-locale'
 
@@ -17,6 +18,11 @@ export function useAppI18n() {
   const stored =
     typeof localStorage !== 'undefined' ? localStorage.getItem(LOCALE_KEY) : null
   const locale = ref(stored === 'en' ? 'en' : 'zh')
+  appLocale.value = locale.value
+
+  watch(locale, (v) => {
+    appLocale.value = v
+  })
 
   function setLocale(code) {
     const next = code === 'en' ? 'en' : 'zh'
@@ -31,10 +37,12 @@ export function useAppI18n() {
     }
   }
 
-  function t(path) {
+  function t(path, ...args) {
     const table = messages[locale.value] ?? messages.zh
     const v = getPath(table, path)
-    return typeof v === 'string' ? v : path
+    if (typeof v === 'function') return v(...args)
+    if (typeof v === 'string') return v
+    return path
   }
 
   const isEnglish = computed(() => locale.value === 'en')

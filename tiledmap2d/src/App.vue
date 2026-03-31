@@ -20,8 +20,8 @@ import { useAppLog } from './composables/useAppLog.js'
 import { useAppTheme } from './composables/useAppTheme.js'
 import { useAppI18n } from './composables/useAppI18n.js'
 
-const tm = reactive(useTileMap())
 const { locale, setLocale, t } = useAppI18n()
+const tm = reactive(useTileMap())
 const { themePreference, setThemePreference } = useAppTheme()
 const appLog = useAppLog()
 const logOpen = ref(false)
@@ -114,24 +114,24 @@ function onImportTileImage(file) {
     const base =
       String(file.name ?? '')
         .replace(/\.[^.]+$/, '')
-        .trim() || `块 ${tm.tileTypes.length}`
+        .trim() || t('tile.unnamed', tm.tileTypes.length)
     const err = await tm.addTileTypeFromImage(base, dataUrl)
     if (err) tm.setError(err)
   }
-  reader.onerror = () => tm.setError('图片读取失败')
+  reader.onerror = () => tm.setError(t('errors.app.imageReadFailed'))
   reader.readAsDataURL(file)
 }
 
 function onEditTileType() {
   const id = tm.selectedTileId
-  const t = tm.tileTypes[id]
-  if (!t) return
+  const tile = tm.tileTypes[id]
+  if (!tile) return
   if (id === 0) {
-    const name = window.prompt('「空」类型名称', t.name)
+    const name = window.prompt(t('errors.app.promptEmptyTileName'), tile.name)
     if (name === null) return
     const trimmed = String(name).trim()
     if (!trimmed) {
-      tm.setError('名称不能为空')
+      tm.setError(t('errors.app.nameRequired'))
       return
     }
     const err = tm.updateTileType(id, { name: trimmed })
@@ -168,16 +168,14 @@ async function onPixelEditorSave(payload) {
 
 function onDeleteTileType() {
   const id = tm.selectedTileId
-  const t = tm.tileTypes[id]
-  if (!t) return
+  const tile = tm.tileTypes[id]
+  if (!tile) return
   if (id === 0) {
-    tm.setError('不能删除「空」类型')
+    tm.setError(t('errors.app.cannotDeleteEmptyType'))
     return
   }
   if (
-    !window.confirm(
-      `删除块类型「${t.name}」？地图上该块将变为空，且更大 id 会顺延重排。`
-    )
+    !window.confirm(t('errors.app.confirmDeleteTileType', tile.name))
   ) {
     return
   }
@@ -189,7 +187,7 @@ function onLayerRenameActive() {
   const index = tm.activeLayerIndex
   const L = tm.layers[index]
   if (!L) return
-  const next = window.prompt('图层名称', L.name)
+  const next = window.prompt(t('errors.app.promptLayerName'), L.name)
   if (next == null) return
   const trimmed = String(next).trim()
   if (!trimmed) return
@@ -201,11 +199,11 @@ function onLayerRemoveActive() {
   const L = tm.layers[index]
   if (!L) return
   if (tm.layers.length <= 1) {
-    tm.setError('至少保留一个图层')
+    tm.setError(t('errors.app.keepOneLayer'))
     return
   }
   if (
-    !window.confirm(`确定删除图层「${L.name}」？此操作不可撤销。`)
+    !window.confirm(t('errors.app.confirmDeleteLayer', L.name))
   ) {
     return
   }
@@ -215,9 +213,7 @@ function onLayerRemoveActive() {
 function onClearMap() {
   if (!tm.hasMap) return
   if (
-    !window.confirm(
-      '确定清空地图？所有图层上的绘制将被清除并恢复为默认空白地图，此操作不可撤销。',
-    )
+    !window.confirm(t('errors.app.confirmClearMap'))
   ) {
     return
   }
@@ -261,9 +257,7 @@ function onMapSettingsConfirm({ width, height, tileSize }) {
     const ts = tm.tileSize
     if (
       (width !== w || height !== h || tileSize !== ts) &&
-      !window.confirm(
-        '应用新地图尺寸将按新宽高裁剪或扩展各图层，可能改变已有绘制。是否继续？',
-      )
+      !window.confirm(t('errors.app.confirmResizeMap'))
     ) {
       return
     }
@@ -271,9 +265,7 @@ function onMapSettingsConfirm({ width, height, tileSize }) {
   } else {
     if (
       tm.hasMap &&
-      !window.confirm(
-        '将创建新地图并替换当前地图（含全部图层与绘制），此操作不可撤销。是否继续？',
-      )
+      !window.confirm(t('errors.app.confirmNewMapReplace'))
     ) {
       return
     }
@@ -303,7 +295,7 @@ async function writeJsonToFileHandle(handle, text) {
 function onSaveAsDownload() {
   const json = tm.exportMap()
   if (json == null) {
-    tm.setError('当前没有可保存的地图')
+    tm.setError(t('errors.app.noMapToSave'))
     return
   }
   downloadJsonFile(json, mapFileSuggestedName.value || 'tiledmap2d.json')
@@ -314,7 +306,7 @@ function onSaveAsDownload() {
 async function onMenuSave() {
   const json = tm.exportMap()
   if (json == null) {
-    tm.setError('当前没有可保存的地图')
+    tm.setError(t('errors.app.noMapToSave'))
     return
   }
   if (mapFileHandle.value && 'createWritable' in mapFileHandle.value) {
@@ -323,7 +315,7 @@ async function onMenuSave() {
       tm.clearError()
       appLog.info(t('log.saved'))
     } catch {
-      tm.setError('保存失败')
+      tm.setError(t('errors.app.saveFailed'))
     }
     return
   }
@@ -333,7 +325,7 @@ async function onMenuSave() {
 async function onMenuSaveAs() {
   const json = tm.exportMap()
   if (json == null) {
-    tm.setError('当前没有可保存的地图')
+    tm.setError(t('errors.app.noMapToSave'))
     return
   }
   if (typeof window.showSaveFilePicker === 'function') {
@@ -342,7 +334,7 @@ async function onMenuSaveAs() {
         suggestedName: mapFileSuggestedName.value || 'tiledmap2d.json',
         types: [
           {
-            description: 'JSON 地图',
+            description: t('errors.app.jsonMapDescription'),
             accept: { 'application/json': ['.json'] },
           },
         ],
@@ -369,9 +361,7 @@ function onMenuNew() {
 async function onMenuOpen() {
   if (
     tm.hasMap &&
-    !window.confirm(
-      '打开文件将替换当前地图，未保存的更改将丢失。是否继续？',
-    )
+    !window.confirm(t('errors.app.confirmOpenReplace'))
   ) {
     return
   }
@@ -380,7 +370,7 @@ async function onMenuOpen() {
       const [handle] = await window.showOpenFilePicker({
         types: [
           {
-            description: 'JSON 地图',
+            description: t('errors.app.jsonMapDescription'),
             accept: { 'application/json': ['.json'] },
           },
         ],
@@ -415,9 +405,7 @@ function onImport(file) {
   if (
     !skip &&
     tm.hasMap &&
-    !window.confirm(
-      '打开文件将替换当前地图，未保存的更改将丢失。是否继续？',
-    )
+    !window.confirm(t('errors.app.confirmOpenReplace'))
   ) {
     return
   }
@@ -433,13 +421,13 @@ function onImport(file) {
       appLog.info(t('log.importedJson'))
     }
   }
-  reader.onerror = () => tm.setError('文件读取失败')
+  reader.onerror = () => tm.setError(t('errors.app.fileReadFailed'))
   reader.readAsText(file, 'UTF-8')
 }
 
 function onExportTmx() {
   if (!tm.hasMap) {
-    tm.setError('当前没有可导出的地图')
+    tm.setError(t('errors.app.noMapToExport'))
     return
   }
   const xml = exportTmx({
@@ -467,9 +455,7 @@ function onExportTmx() {
 function onImportTmx(file) {
   if (
     tm.hasMap &&
-    !window.confirm(
-      '导入 TMX 将替换当前地图，未保存的更改将丢失。是否继续？',
-    )
+    !window.confirm(t('errors.app.confirmImportTmxReplace'))
   ) {
     return
   }
@@ -489,7 +475,7 @@ function onImportTmx(file) {
       appLog.info(t('log.importedTmx'))
     }
   }
-  reader.onerror = () => tm.setError('文件读取失败')
+  reader.onerror = () => tm.setError(t('errors.app.fileReadFailed'))
   reader.readAsText(file, 'UTF-8')
 }
 
@@ -599,12 +585,12 @@ function onMenuShowFormats() {
           class="dock-edge dock-edge--left"
           :class="{ 'dock-edge--active': dockMapLayersCollapsed }"
           role="toolbar"
-          aria-label="左侧折叠停靠"
+          :aria-label="t('docks.dockLeftAria')"
         >
           <DockEdgeButton
             v-if="dockMapLayersCollapsed"
             placement="left"
-            label="地图层"
+            :label="t('docks.mapLayers')"
             @expand="dockMapLayersCollapsed = false"
           />
         </div>
@@ -691,18 +677,18 @@ function onMenuShowFormats() {
           class="dock-edge dock-edge--right"
           :class="{ 'dock-edge--active': rightDockEdgeActive }"
           role="toolbar"
-          aria-label="右侧折叠停靠"
+          :aria-label="t('docks.dockRightAria')"
         >
           <DockEdgeButton
             v-if="dockPaletteCollapsed"
             placement="right"
-            label="块库"
+            :label="t('docks.palette')"
             @expand="dockPaletteCollapsed = false"
           />
           <DockEdgeButton
             v-if="dockBlockDefCollapsed"
             placement="right"
-            label="块定义"
+            :label="t('docks.blockDef')"
             @expand="dockBlockDefCollapsed = false"
           />
         </div>

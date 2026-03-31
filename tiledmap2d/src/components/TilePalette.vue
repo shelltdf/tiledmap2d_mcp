@@ -1,4 +1,9 @@
 <script setup>
+import { inject } from 'vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
+
 defineProps({
   types: { type: Array, required: true },
   selectedId: { type: Number, required: true },
@@ -23,22 +28,22 @@ function onImportImage(e) {
 </script>
 
 <template>
-  <aside class="palette dock--fill win-panel" aria-label="块库">
+  <aside class="palette dock--fill win-panel" :aria-label="t('docks.palette')">
     <div class="dock-head">
-      <div class="dock-title">块库</div>
+      <div class="dock-title">{{ t('docks.palette') }}</div>
       <button
         type="button"
         class="dock-collapse-btn"
-        title="折叠到右缘"
-        aria-label="折叠块库停靠面板"
+        :title="t('docks.paletteCollapse')"
+        :aria-label="t('docks.paletteCollapseAria')"
         @click="emit('collapse')"
       >
         ⟩
       </button>
     </div>
     <div class="palette-toolbar">
-      <label class="pal-btn" title="导入图片，追加为新块类型">
-        导入
+      <label class="pal-btn" :title="t('paletteUi.importTitle')">
+        {{ t('paletteUi.import') }}
         <input
           type="file"
           class="pal-file"
@@ -47,39 +52,39 @@ function onImportImage(e) {
         />
       </label>
       <button type="button" class="pal-btn" @click="emit('edit-type')">
-        编辑
+        {{ t('paletteUi.edit') }}
       </button>
       <button
         type="button"
         class="pal-btn pal-btn--danger"
         @click="emit('delete-type')"
       >
-        删除
+        {{ t('paletteUi.delete') }}
       </button>
     </div>
     <div class="palette-grid">
       <button
-        v-for="t in types"
-        :key="t.id"
+        v-for="item in types"
+        :key="item.id"
         type="button"
         class="swatch"
-        :class="{ active: selectedId === t.id }"
-        :title="t.name"
-        @click="emit('select', Number(t.id))"
+        :class="{ active: selectedId === item.id }"
+        :title="item.name"
+        @click="emit('select', Number(item.id))"
       >
         <img
-          v-if="t.imageDataUrl"
+          v-if="item.imageDataUrl"
           class="swatch-img"
-          :src="t.imageDataUrl"
+          :src="item.imageDataUrl"
           alt=""
         />
         <span
-          v-else-if="t.color"
+          v-else-if="item.color"
           class="swatch-fill"
-          :style="{ background: t.color }"
+          :style="{ background: item.color }"
         />
-        <span v-else class="swatch-empty">空</span>
-        <span class="swatch-label">{{ t.name }}</span>
+        <span v-else class="swatch-empty">{{ t('paletteUi.emptySwatch') }}</span>
+        <span class="swatch-label">{{ item.name }}</span>
       </button>
     </div>
   </aside>

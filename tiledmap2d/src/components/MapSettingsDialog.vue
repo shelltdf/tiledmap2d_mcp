@@ -1,5 +1,8 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, inject } from 'vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -15,9 +18,10 @@ const w = ref('32')
 const h = ref('24')
 const ts = ref('32')
 
-const titleText = computed(() =>
-  props.mode === 'edit' ? '地图设置' : '新建地图'
-)
+const titleText = computed(() => {
+  shell?.locale?.value
+  return props.mode === 'edit' ? t('mapSettings.titleEdit') : t('mapSettings.titleNew')
+})
 
 const tileCount = computed(() => {
   const a = parseInt(w.value, 10)
@@ -67,11 +71,13 @@ function onCancel() {
       >
         <div class="dlg-head">
           <h2 id="map-settings-title" class="dlg-title">{{ titleText }}</h2>
-          <button type="button" class="win-btn" @click="onCancel">取消</button>
+          <button type="button" class="win-btn" @click="onCancel">
+            {{ t('common.cancel') }}
+          </button>
         </div>
         <div class="dlg-body">
           <div class="field">
-            <label class="lbl" for="ms-w">宽度（格）</label>
+            <label class="lbl" for="ms-w">{{ t('mapSettings.width') }}</label>
             <input
               id="ms-w"
               v-model="w"
@@ -82,7 +88,7 @@ function onCancel() {
             />
           </div>
           <div class="field">
-            <label class="lbl" for="ms-h">高度（格）</label>
+            <label class="lbl" for="ms-h">{{ t('mapSettings.height') }}</label>
             <input
               id="ms-h"
               v-model="h"
@@ -93,7 +99,7 @@ function onCancel() {
             />
           </div>
           <div class="field">
-            <label class="lbl" for="ms-ts">瓦片像素边长</label>
+            <label class="lbl" for="ms-ts">{{ t('mapSettings.tileSize') }}</label>
             <input
               id="ms-ts"
               v-model="ts"
@@ -103,11 +109,13 @@ function onCancel() {
               max="128"
             />
           </div>
-          <p class="meta">格总数（宽×高）：<strong>{{ tileCount }}</strong></p>
+          <p class="meta">
+            {{ t('mapSettings.cellCount') }}<strong>{{ tileCount }}</strong>
+          </p>
         </div>
         <div class="dlg-foot">
           <button type="button" class="win-btn primary" @click="onOk">
-            {{ mode === 'edit' ? '应用' : '创建' }}
+            {{ mode === 'edit' ? t('common.apply') : t('common.create') }}
           </button>
         </div>
       </div>

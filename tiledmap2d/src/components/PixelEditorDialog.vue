@@ -1,5 +1,8 @@
 <script setup>
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, inject } from 'vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -38,10 +41,11 @@ const brushColorHex = computed(() => {
 })
 
 const colorDepthLabel = computed(() => {
+  shell?.locale?.value
   if (localColorDepthMode.value === 'indexed8') {
-    return '索引色 · 8 位调色板 · 最多 256 色'
+    return t('pixelEditor.depthIndexed')
   }
-  return 'RGBA · 每通道 8 位 · 深度 32 bpp'
+  return t('pixelEditor.depthRgba')
 })
 
 function clampSize(n) {
@@ -191,11 +195,7 @@ function onPointerUp(e) {
 }
 
 function onClear() {
-  if (
-    !window.confirm(
-      '用底色填满将覆盖当前画布上的全部像素，是否继续？',
-    )
-  ) {
+  if (!window.confirm(t('pixelEditor.confirmFill'))) {
     return
   }
   const canvas = canvasRef.value
@@ -231,7 +231,7 @@ function buildSavePayload() {
 function onSave() {
   const payload = buildSavePayload()
   if (!payload) {
-    window.alert('名称不能为空')
+    window.alert(t('pixelEditor.nameRequiredAlert'))
     return
   }
   emit('save', payload)
@@ -251,11 +251,7 @@ function onImportFile(e) {
   const f = input.files?.[0]
   input.value = ''
   if (!f || !/^image\//.test(f.type)) return
-  if (
-    !window.confirm(
-      '导入图片将替换当前画布上的全部像素，是否继续？',
-    )
-  ) {
+  if (!window.confirm(t('pixelEditor.confirmImportReplace'))) {
     return
   }
   const reader = new FileReader()
@@ -328,30 +324,35 @@ function onColorDepthChange() {
       >
         <div class="dlg-head">
           <h2 id="pixel-editor-title" class="dlg-title">
-            像素编辑 — {{ localName || '块' }}
+            {{ t('pixelEditor.titlePrefix') }} —
+            {{ localName || t('pixelEditor.tileFallback') }}
           </h2>
           <button
             type="button"
             class="dlg-close-ico"
-            aria-label="关闭"
-            title="关闭"
+            :aria-label="t('pixelEditor.close')"
+            :title="t('pixelEditor.close')"
             @click="onCancel"
           >
             <span class="dlg-close-glyph" aria-hidden="true">×</span>
           </button>
         </div>
 
-        <div class="pe-menu-toolbar win-chrome-strip" role="toolbar" aria-label="像素编辑命令">
+        <div
+          class="pe-menu-toolbar win-chrome-strip"
+          role="toolbar"
+          :aria-label="t('pixelEditor.toolbarAria')"
+        >
           <button
             type="button"
             class="win-btn"
             :class="dirty ? 'pe-save-dirty' : 'primary'"
             @click="onSave"
           >
-            保存
+            {{ t('pixelEditor.save') }}
           </button>
           <button type="button" class="win-btn" @click="onImportClick">
-            导入
+            {{ t('pixelEditor.import') }}
           </button>
           <input
             ref="importInputRef"
@@ -363,14 +364,14 @@ function onColorDepthChange() {
             @change="onImportFile"
           />
           <button type="button" class="win-btn" @click="onExportClick">
-            导出
+            {{ t('pixelEditor.export') }}
           </button>
         </div>
 
         <div class="dlg-body pe-workspace">
-          <aside class="pe-toolrail" aria-label="绘制工具">
-            <span class="pe-toolrail-label">颜色</span>
-            <label class="pe-color-swatch" title="当前前景色">
+          <aside class="pe-toolrail" :aria-label="t('pixelEditor.toolrailAria')">
+            <span class="pe-toolrail-label">{{ t('pixelEditor.color') }}</span>
+            <label class="pe-color-swatch" :title="t('pixelEditor.fgColorTitle')">
               <input
                 v-model="brushColor"
                 type="color"
@@ -381,10 +382,10 @@ function onColorDepthChange() {
             <button
               type="button"
               class="win-btn pe-toolrail-btn"
-              title="用底色填满画布"
+              :title="t('pixelEditor.fillCanvasTitle')"
               @click="onClear"
             >
-              填满
+              {{ t('pixelEditor.fill') }}
             </button>
           </aside>
 
@@ -420,15 +421,16 @@ function onColorDepthChange() {
               </div>
             </div>
             <p class="pe-canvas-hint">
-              {{ pixelW }}×{{ pixelH }} 像素 · 单像素笔刷 · 导入替换当前画布 · 导出另存为 PNG
+              {{ pixelW }}×{{ pixelH }}
+              {{ t('pixelEditor.canvasHintSuffix') }}
             </p>
           </div>
 
-          <aside class="pe-props win-panel" aria-label="属性">
-            <div class="pe-props-title">属性</div>
+          <aside class="pe-props win-panel" :aria-label="t('pixelEditor.propsAria')">
+            <div class="pe-props-title">{{ t('pixelEditor.propsTitle') }}</div>
             <dl class="pe-props-dl">
               <div class="pe-props-row pe-props-row--full">
-                <dt>名称</dt>
+                <dt>{{ t('pixelEditor.name') }}</dt>
                 <dd>
                   <input
                     v-model="localName"
@@ -440,7 +442,7 @@ function onColorDepthChange() {
                 </dd>
               </div>
               <div class="pe-props-row pe-props-row--full">
-                <dt>尺寸</dt>
+                <dt>{{ t('pixelEditor.size') }}</dt>
                 <dd class="pe-size-row">
                   <input
                     v-model.number="pixelW"
@@ -463,20 +465,20 @@ function onColorDepthChange() {
                 </dd>
               </div>
               <div class="pe-props-row pe-props-row--full">
-                <dt>碰撞</dt>
+                <dt>{{ t('pixelEditor.collision') }}</dt>
                 <dd>
                   <select
                     v-model="localCollision"
                     class="pe-sel"
                     @change="onCollisionChange"
                   >
-                    <option value="none">无</option>
-                    <option value="block">阻断</option>
+                    <option value="none">{{ t('pixelEditor.colNone') }}</option>
+                    <option value="block">{{ t('pixelEditor.colBlock') }}</option>
                   </select>
                 </dd>
               </div>
               <div class="pe-props-row pe-props-row--full">
-                <dt>透明色</dt>
+                <dt>{{ t('pixelEditor.transparent') }}</dt>
                 <dd class="pe-trans-wrap">
                   <label class="pe-check">
                     <input
@@ -484,7 +486,7 @@ function onColorDepthChange() {
                       type="checkbox"
                       @change="onTransparentToggle"
                     />
-                    启用
+                    {{ t('pixelEditor.transparentEnable') }}
                   </label>
                   <input
                     v-model="transparentHex"
@@ -497,25 +499,25 @@ function onColorDepthChange() {
                 </dd>
               </div>
               <div class="pe-props-row pe-props-row--full">
-                <dt>色彩与深度</dt>
+                <dt>{{ t('pixelEditor.colorDepth') }}</dt>
                 <dd>
                   <select
                     v-model="localColorDepthMode"
                     class="pe-sel"
                     @change="onColorDepthChange"
                   >
-                    <option value="rgba8">真彩色 RGBA</option>
-                    <option value="indexed8">索引色（8 位）</option>
+                    <option value="rgba8">{{ t('blockDef.rgba') }}</option>
+                    <option value="indexed8">{{ t('blockDef.indexed') }}</option>
                   </select>
                   <p class="pe-depth-hint">{{ colorDepthLabel }}</p>
                 </dd>
               </div>
               <div class="pe-props-row">
-                <dt>笔刷色</dt>
+                <dt>{{ t('pixelEditor.brushColor') }}</dt>
                 <dd class="mono">{{ brushColorHex }}</dd>
               </div>
               <div class="pe-props-row">
-                <dt>底填色</dt>
+                <dt>{{ t('pixelEditor.fillColor') }}</dt>
                 <dd class="pe-swatch-inline">
                   <span
                     class="pe-swatch-dot"

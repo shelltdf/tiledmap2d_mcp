@@ -1,9 +1,14 @@
 <script setup>
+import { inject } from 'vue'
+
 defineProps({
   open: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close'])
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 </script>
 
 <template>
@@ -22,50 +27,38 @@ const emit = defineEmits(['close'])
         @keydown.escape.prevent="emit('close')"
       >
         <div class="dlg-head">
-          <h2 id="formats-title" class="dlg-title">支持的文件格式（TiledMap2D）</h2>
+          <h2 id="formats-title" class="dlg-title">{{ t('formatsHelp.title') }}</h2>
           <button type="button" class="dlg-close win-btn" @click="emit('close')">
-            关闭
+            {{ t('formatsHelp.close') }}
           </button>
         </div>
         <div class="dlg-body win-scrollbar">
           <p class="fmt-lead">
-            本工具处理的是<strong>二维正交网格</strong>上的瓦片索引，与 GIS
-            中的地球瓦片/金字塔切片<strong>不是同一类数据</strong>。
+            {{ t('formatsHelp.lead') }}
           </p>
           <section class="fmt-block">
-            <h3>JSON（本编辑器原生）</h3>
-            <p>UTF-8 文本，用于与本工具互相同步地图数据。</p>
+            <h3>{{ t('formatsHelp.jsonHeading') }}</h3>
+            <p>{{ t('formatsHelp.jsonP') }}</p>
             <ul>
-              <li><code>version</code>：当前导出力 <code>3</code>（多图层、<code>kind</code>）；仍可读 <code>2</code> / <code>1</code></li>
-              <li><code>tileSize</code>：单格像素边长（8～128）</li>
-              <li><code>width</code> / <code>height</code>：地图宽高（格数，1～256）</li>
-              <li>
-                <code>layers</code>（v2/v3）：数组；每项含 <code>name</code>、<code>visible</code>、<code>tiles</code>；v3 另有 <code>kind</code>：<code>tile</code>（Tile）、<code>image</code>（Sprite）、<code>area</code>（Location）；
-                另可有 <code>activeLayerIndex</code>
-              </li>
-              <li>
-                <code>tiles</code>（v1 仅）：单层二维数组，导入后视为名为「地面」的一层
-              </li>
+              <li>{{ t('formatsHelp.jsonLi1') }}</li>
+              <li>{{ t('formatsHelp.jsonLi2') }}</li>
+              <li>{{ t('formatsHelp.jsonLi3') }}</li>
+              <li>{{ t('formatsHelp.jsonLi4') }}</li>
+              <li>{{ t('formatsHelp.jsonLi5') }}</li>
             </ul>
           </section>
           <section class="fmt-block">
-            <h3>TMX（Tiled Map Editor）</h3>
-            <p>与 <strong>Tiled</strong> 交换的正交地图 XML（<code>.tmx</code>）。</p>
+            <h3>{{ t('formatsHelp.tmxHeading') }}</h3>
+            <p>{{ t('formatsHelp.tmxP') }}</p>
             <ul>
-              <li>仅支持 <code>orientation=&quot;orthogonal&quot;</code>、<code>infinite=&quot;0&quot;</code></li>
-              <li>读取第一个 <code>&lt;tileset&gt;</code> 的 <code>firstgid</code>；按顺序读取全部 <code>&lt;layer&gt;</code> 的 <code>&lt;data&gt;</code>（多图层）</li>
-              <li>
-                图层数据支持：<code>encoding=&quot;csv&quot;</code>，或
-                <code>encoding=&quot;base64&quot;</code> 且 <code>compression=&quot;zlib&quot;</code>
-              </li>
-              <li>GID <code>0</code> 为空格；非零格按 <code>编辑器瓦片 id = gid - firstgid + 1</code> 换算（与导出时 <code>firstgid=1</code> 约定一致）</li>
-              <li>
-                导出 TMX 会引用同目录下的 <code>tilemap-palette.png</code> 作为图块图；在 Tiled
-                中打开时请将该文件放在与 <code>.tmx</code> 相同目录（或使用自建图块图并保持一致）
-              </li>
+              <li>{{ t('formatsHelp.tmxLi1') }}</li>
+              <li>{{ t('formatsHelp.tmxLi2') }}</li>
+              <li>{{ t('formatsHelp.tmxLi3') }}</li>
+              <li>{{ t('formatsHelp.tmxLi4') }}</li>
+              <li>{{ t('formatsHelp.tmxLi5') }}</li>
             </ul>
           </section>
-          <p class="fmt-note">完整字段与边界以仓库内工程文档 <code>ai-software-engineering/02-physical/tiledmap2d/spec.md</code> 为准。</p>
+          <p class="fmt-note">{{ t('formatsHelp.note') }}</p>
         </div>
       </div>
     </div>

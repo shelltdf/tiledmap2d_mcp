@@ -1,4 +1,9 @@
 <script setup>
+import { inject } from 'vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
+
 defineProps({
   /** 已创建或打开过地图 */
   mapReady: { type: Boolean, default: true },
@@ -42,21 +47,21 @@ function kindBadge(layer) {
 
 function kindTitle(layer) {
   const k = layer?.kind || 'tile'
-  if (k === 'image') return 'Sprite'
-  if (k === 'area') return 'Location'
-  return 'Tile'
+  if (k === 'image') return t('layerKind.sprite')
+  if (k === 'area') return t('layerKind.location')
+  return t('layerKind.tile')
 }
 </script>
 
 <template>
-  <aside class="dock dock--fill win-panel" aria-label="地图层">
+  <aside class="dock dock--fill win-panel" :aria-label="t('docks.mapLayers')">
     <div class="dock-head">
-      <div class="dock-title">地图层</div>
+      <div class="dock-title">{{ t('docks.mapLayers') }}</div>
       <button
         type="button"
         class="dock-collapse-btn"
-        title="折叠到左缘"
-        aria-label="折叠地图层面板"
+        :title="t('docks.mapLayersCollapse')"
+        :aria-label="t('docks.mapLayersCollapseAria')"
         @click="emit('collapse')"
       >
         ⟨
@@ -66,29 +71,29 @@ function kindTitle(layer) {
       <button
         type="button"
         class="win-btn btn-sm"
-        title="添加图层"
+        :title="t('docks.addLayer')"
         :disabled="!mapReady"
         @click="emit('open-add-dialog')"
       >
-        添加
+        {{ t('docks.add') }}
       </button>
       <button
         type="button"
         class="win-btn btn-sm"
-        title="重命名当前选中图层"
+        :title="t('docks.renameLayer')"
         :disabled="!mapReady"
         @click="emit('rename-active')"
       >
-        改名
+        {{ t('docks.rename') }}
       </button>
       <button
         type="button"
         class="win-btn btn-sm btn-danger"
-        title="删除当前选中图层"
+        :title="t('docks.deleteLayer')"
         :disabled="!mapReady || layers.length <= 1"
         @click="emit('remove-active')"
       >
-        删除
+        {{ t('docks.delete') }}
       </button>
     </div>
     <ul
@@ -114,13 +119,17 @@ function kindTitle(layer) {
       >
         <span class="kind-badge" :title="kindTitle(layer)">{{ kindBadge(layer) }}</span>
         <span class="layer-name" :title="layer.name">{{ layer.name }}</span>
-        <label class="vis-toggle" :title="layer.visible ? '隐藏' : '显示'" @click.stop>
+        <label
+          class="vis-toggle"
+          :title="layer.visible ? t('docks.show') : t('docks.hide')"
+          @click.stop
+        >
           <input
             type="checkbox"
             :checked="layer.visible"
             @change="emit('toggle-visible', index, $event.target.checked)"
           />
-          <span class="vis-label">{{ layer.visible ? '显' : '隐' }}</span>
+          <span class="vis-label">{{ layer.visible ? t('docks.vis') : t('docks.hide') }}</span>
         </label>
       </li>
     </ul>

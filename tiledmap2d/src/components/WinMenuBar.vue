@@ -58,7 +58,7 @@ onUnmounted(() => {
   <nav
     class="win-menubar"
     role="menubar"
-    aria-label="主菜单"
+    :aria-label="t('winMenu.ariaMain')"
     @click.stop
   >
     <div class="menu-top">

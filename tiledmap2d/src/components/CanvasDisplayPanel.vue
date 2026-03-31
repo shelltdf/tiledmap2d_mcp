@@ -1,9 +1,14 @@
 <script setup>
+import { inject } from 'vue'
+
 defineProps({
   showGrid: { type: Boolean, default: true },
   showOrigin: { type: Boolean, default: false },
   showCollisionVolume: { type: Boolean, default: true },
 })
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 
 const emit = defineEmits([
   'update:showGrid',
@@ -13,40 +18,35 @@ const emit = defineEmits([
 </script>
 
 <template>
-  <div class="dtb win-panel" role="group" aria-label="显示辅助">
-    <div class="dtb-title">显示</div>
-    <label
-      class="dtb-row"
-      title="棋盘格深浅底纹；关闭后空白格透明，与视口背景一致"
-    >
+  <div
+    class="dtb win-panel"
+    role="group"
+    :aria-label="t('display.groupAria')"
+  >
+    <div class="dtb-title">{{ t('display.title') }}</div>
+    <label class="dtb-row" :title="t('display.gridTitle')">
       <input
         type="checkbox"
         :checked="showGrid"
         @change="emit('update:showGrid', $event.target.checked)"
       />
-      <span>网格</span>
+      <span>{{ t('display.grid') }}</span>
     </label>
-    <label
-      class="dtb-row"
-      title="原点格描边，并标注 (0,0) 与 (1,1)"
-    >
+    <label class="dtb-row" :title="t('display.originTitle')">
       <input
         type="checkbox"
         :checked="showOrigin"
         @change="emit('update:showOrigin', $event.target.checked)"
       />
-      <span>原点</span>
+      <span>{{ t('display.origin') }}</span>
     </label>
-    <label
-      class="dtb-row"
-      title="开启后，在块库中碰撞为「阻断」的格子上叠加显示碰撞体积"
-    >
+    <label class="dtb-row" :title="t('display.collisionTitle')">
       <input
         type="checkbox"
         :checked="showCollisionVolume"
         @change="emit('update:showCollisionVolume', $event.target.checked)"
       />
-      <span>碰撞体积</span>
+      <span>{{ t('display.collision') }}</span>
     </label>
   </div>
 </template>

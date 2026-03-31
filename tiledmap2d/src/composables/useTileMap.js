@@ -1,79 +1,82 @@
 import { ref, computed, shallowRef } from 'vue'
 import { averageColorFromDataUrl } from '../utils/tileImage.js'
+import { te } from '../i18n/te.js'
 
-/** 默认块库（新建地图时的初始 palette） */
-export const DEFAULT_TILE_TYPES = [
-  {
-    id: 0,
-    name: '空',
-    color: null,
-    imageDataUrl: null,
-    collisionType: 'none',
-    transparentColor: null,
-    textureWidth: null,
-    textureHeight: null,
-    colorDepthMode: 'rgba8',
-  },
-  {
-    id: 1,
-    name: '草地',
-    color: '#6ebf4a',
-    imageDataUrl: null,
-    collisionType: 'none',
-    transparentColor: null,
-    textureWidth: null,
-    textureHeight: null,
-    colorDepthMode: 'rgba8',
-  },
-  {
-    id: 2,
-    name: '水',
-    color: '#3b8fd9',
-    imageDataUrl: null,
-    collisionType: 'none',
-    transparentColor: null,
-    textureWidth: null,
-    textureHeight: null,
-    colorDepthMode: 'rgba8',
-  },
-  {
-    id: 3,
-    name: '沙地',
-    color: '#d4c4a8',
-    imageDataUrl: null,
-    collisionType: 'none',
-    transparentColor: null,
-    textureWidth: null,
-    textureHeight: null,
-    colorDepthMode: 'rgba8',
-  },
-  {
-    id: 4,
-    name: '石砖',
-    color: '#8a8a8a',
-    imageDataUrl: null,
-    collisionType: 'none',
-    transparentColor: null,
-    textureWidth: null,
-    textureHeight: null,
-    colorDepthMode: 'rgba8',
-  },
-  {
-    id: 5,
-    name: '木',
-    color: '#a67c52',
-    imageDataUrl: null,
-    collisionType: 'none',
-    transparentColor: null,
-    textureWidth: null,
-    textureHeight: null,
-    colorDepthMode: 'rgba8',
-  },
-]
+/** 默认块库（新建地图时的初始 palette；名称随界面语言） */
+function getDefaultTileTypes() {
+  return [
+    {
+      id: 0,
+      name: te('palette.empty'),
+      color: null,
+      imageDataUrl: null,
+      collisionType: 'none',
+      transparentColor: null,
+      textureWidth: null,
+      textureHeight: null,
+      colorDepthMode: 'rgba8',
+    },
+    {
+      id: 1,
+      name: te('palette.grass'),
+      color: '#6ebf4a',
+      imageDataUrl: null,
+      collisionType: 'none',
+      transparentColor: null,
+      textureWidth: null,
+      textureHeight: null,
+      colorDepthMode: 'rgba8',
+    },
+    {
+      id: 2,
+      name: te('palette.water'),
+      color: '#3b8fd9',
+      imageDataUrl: null,
+      collisionType: 'none',
+      transparentColor: null,
+      textureWidth: null,
+      textureHeight: null,
+      colorDepthMode: 'rgba8',
+    },
+    {
+      id: 3,
+      name: te('palette.sand'),
+      color: '#d4c4a8',
+      imageDataUrl: null,
+      collisionType: 'none',
+      transparentColor: null,
+      textureWidth: null,
+      textureHeight: null,
+      colorDepthMode: 'rgba8',
+    },
+    {
+      id: 4,
+      name: te('palette.stone'),
+      color: '#8a8a8a',
+      imageDataUrl: null,
+      collisionType: 'none',
+      transparentColor: null,
+      textureWidth: null,
+      textureHeight: null,
+      colorDepthMode: 'rgba8',
+    },
+    {
+      id: 5,
+      name: te('palette.wood'),
+      color: '#a67c52',
+      imageDataUrl: null,
+      collisionType: 'none',
+      transparentColor: null,
+      textureWidth: null,
+      textureHeight: null,
+      colorDepthMode: 'rgba8',
+    },
+  ]
+}
 
 /** 无地图时仅保留「空」类型，表示尚未载入任何块库 */
 function cloneEmptyOnlyPalette() {
-  return cloneTileTypes([DEFAULT_TILE_TYPES[0]])
+  return cloneTileTypes([getDefaultTileTypes()[0]])
 }
 
 /**
@@ -123,7 +126,7 @@ function syncPlainTileTextureDimsToMapTileSize(oldTs, newTs) {
   })
 }
 
-function cloneTileTypes(source = DEFAULT_TILE_TYPES) {
+function cloneTileTypes(source = getDefaultTileTypes()) {
   return source.map((t) => ({
     id: t.id,
     name: t.name,
@@ -184,14 +187,16 @@ function resizeTilesGrid(oldTiles, oldW, oldH, newW, newH) {
 }
 
 function validateTilesGrid(rows, tw, th, maxTileTypeCount) {
-  if (!Array.isArray(rows) || rows.length !== th) return 'tiles 行数与 height 不符'
+  if (!Array.isArray(rows) || rows.length !== th)
+    return te('errors.tileMap.tilesRowCount')
   for (let y = 0; y < th; y++) {
     const row = rows[y]
-    if (!Array.isArray(row) || row.length !== tw) return `第 ${y} 行列数与 width 不符`
+    if (!Array.isArray(row) || row.length !== tw)
+      return te('errors.tileMap.rowWidthMismatch', y)
     for (let x = 0; x < tw; x++) {
       const v = row[x]
       if (!Number.isInteger(v) || v < 0 || v >= maxTileTypeCount) {
-        return `非法瓦片 id：(${x},${y})`
+        return te('errors.tileMap.tileAtInvalid', x, y)
       }
     }
   }
@@ -351,7 +356,7 @@ export function useTileMap() {
     width.value = cw
     height.value = ch
     tileSize.value = cts
-    replaceLayers([createLayer('地面', cw, ch, 'tile')], 0)
+    replaceLayers([createLayer(te('layer.defaultGround'), cw, ch, 'tile')], 0)
     hasMap.value = true
     tileTypes.value = cloneDefaultPaletteForMapTileSize(cts)
     selectedTileId.value = 1
@@ -549,17 +554,19 @@ export function useTileMap() {
   function parseLayersFromData(data, tw, th, maxId) {
     const layerList = data.layers
     if (!Array.isArray(layerList) || layerList.length < 1) {
-      return 'layers 无效或为空'
+      return te('errors.tileMap.layersInvalid')
     }
     const parsed = []
     for (let li = 0; li < layerList.length; li++) {
       const raw = layerList[li]
-      if (!raw || typeof raw !== 'object') return `第 ${li} 层无效`
-      const name = String(raw.name ?? `图层 ${li + 1}`).trim() || `图层 ${li + 1}`
+      if (!raw || typeof raw !== 'object')
+        return te('errors.tileMap.layerInvalid', li)
+      const defName = te('layer.unnamed', li + 1)
+      const name = String(raw.name ?? defName).trim() || defName
       const visible = raw.visible !== false
       const kind = normalizeLayerKind(raw.kind)
       const err = validateTilesGrid(raw.tiles, tw, th, maxId)
-      if (err) return `层 «${name}»：${err}`
+      if (err) return te('errors.tileMap.layerTileError', name, err)
       parsed.push({
         id: ++layerSeq,
         name,
@@ -577,14 +584,15 @@ export function useTileMap() {
    */
   function applyTileTypesFromJsonArray(arr) {
     if (!Array.isArray(arr) || arr.length < 1) {
-      return 'tile类型数组无效'
+      return te('errors.tileMap.tileTypesInvalid')
     }
-    if (arr.length > 256) return '块类型数量过多（≤256）'
+    if (arr.length > 256) return te('errors.tileMap.tooManyTileTypes')
     const next = []
     for (let i = 0; i < arr.length; i++) {
       const raw = arr[i]
-      if (!raw || typeof raw !== 'object') return `第 ${i} 项无效`
-      const name = String(raw.name ?? '').trim() || `块 ${i}`
+      if (!raw || typeof raw !== 'object')
+        return te('errors.tileMap.tileTypeItemInvalid', i)
+      const name = String(raw.name ?? '').trim() || te('tile.unnamed', i)
       let color = raw.color
       if (i === 0) {
         color = null
@@ -594,7 +602,7 @@ export function useTileMap() {
         } else {
           color = String(color).trim()
           if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-            return `第 ${i} 项颜色须为 #RRGGBB`
+            return te('errors.tileMap.tileTypeColorHex', i)
           }
         }
       }
@@ -602,7 +610,7 @@ export function useTileMap() {
       if (i !== 0 && raw.imageDataUrl != null && raw.imageDataUrl !== '') {
         imageDataUrl = String(raw.imageDataUrl)
         if (!imageDataUrl.startsWith('data:image/')) {
-          return `第 ${i} 项 imageDataUrl 须为 data:image/*`
+          return te('errors.tileMap.tileTypeImageDataUrl', i)
         }
       }
       const collisionType = raw.collisionType === 'block' ? 'block' : 'none'
@@ -614,7 +622,7 @@ export function useTileMap() {
       ) {
         const tc = String(raw.transparentColor).trim()
         if (!/^#[0-9a-fA-F]{6}$/.test(tc)) {
-          return `第 ${i} 项 transparentColor 须为 #RRGGBB 或留空`
+          return te('errors.tileMap.tileTypeTransparentColor', i)
         }
         transparentColor = tc.toUpperCase()
       }
@@ -623,14 +631,14 @@ export function useTileMap() {
       if (raw.textureWidth != null && raw.textureWidth !== '') {
         const tw = Math.floor(Number(raw.textureWidth))
         if (!Number.isFinite(tw) || tw < 8 || tw > 128) {
-          return `第 ${i} 项 textureWidth 须在 8～128`
+          return te('errors.tileMap.tileTypeTextureWidth', i)
         }
         textureWidth = tw
       }
       if (raw.textureHeight != null && raw.textureHeight !== '') {
         const th = Math.floor(Number(raw.textureHeight))
         if (!Number.isFinite(th) || th < 8 || th > 128) {
-          return `第 ${i} 项 textureHeight 须在 8～128`
+          return te('errors.tileMap.tileTypeTextureHeight', i)
         }
         textureHeight = th
       }
@@ -661,13 +669,16 @@ export function useTileMap() {
     const tw = Number(data.width)
     const th = Number(data.height)
     const ts = Number(data.tileSize)
-    if (!Number.isInteger(tw) || tw < 1 || tw > 256) return 'width 无效'
-    if (!Number.isInteger(th) || th < 1 || th > 256) return 'height 无效'
-    if (!Number.isInteger(ts) || ts < 8 || ts > 128) return 'tileSize 无效'
+    if (!Number.isInteger(tw) || tw < 1 || tw > 256)
+      return te('errors.tileMap.widthInvalid')
+    if (!Number.isInteger(th) || th < 1 || th > 256)
+      return te('errors.tileMap.heightInvalid')
+    if (!Number.isInteger(ts) || ts < 8 || ts > 128)
+      return te('errors.tileMap.tileSizeInvalid')
 
     if (Array.isArray(data.tileTypes) && data.tileTypes.length > 0) {
       const terr = applyTileTypesFromJsonArray(data.tileTypes)
-      if (terr) return `tileTypes：${terr}`
+      if (terr) return te('errors.tileMap.tileTypesPrefix', terr)
     }
 
     const maxId = tileTypes.value.length
@@ -697,7 +708,7 @@ export function useTileMap() {
         [
           {
             id: ++layerSeq,
-            name: '地面',
+            name: te('layer.defaultGround'),
             visible: true,
             kind: 'tile',
             tiles: data.tiles.map((r) => r.slice()),
@@ -711,7 +722,7 @@ export function useTileMap() {
       return null
     }
 
-    return `版本不匹配：需要 ${MAP_VERSION} / ${MAP_VERSION_V2} / ${MAP_VERSION_LEGACY}，实际 ${ver}`
+    return te('errors.tileMap.versionMismatch', ver)
   }
 
   function importMapJson(text) {
@@ -719,7 +730,7 @@ export function useTileMap() {
     try {
       data = JSON.parse(text)
     } catch {
-      return 'JSON 解析失败'
+      return te('errors.tileMap.jsonParseFailed')
     }
     return validateAndLoad(data)
   }
@@ -745,16 +756,16 @@ export function useTileMap() {
    * 每项：`{ name, color, imageDataUrl? }`，首项为「空」。
    */
   function importTileTypesJson(text) {
-    if (!hasMap.value) return '请先创建或打开地图'
+    if (!hasMap.value) return te('errors.tileMap.needMapOrOpen')
     let data
     try {
       data = JSON.parse(text)
     } catch {
-      return 'JSON 解析失败'
+      return te('errors.tileMap.jsonParseFailed')
     }
     const arr = Array.isArray(data) ? data : data?.types
     if (!Array.isArray(arr) || arr.length < 1) {
-      return '需要 JSON 数组，或包含 types 数组的对象'
+      return te('errors.tileMap.needTypesArray')
     }
     const err = applyTileTypesFromJsonArray(arr)
     if (err) return err
@@ -764,14 +775,16 @@ export function useTileMap() {
 
   /** 从图片 data URL 追加一种块类型 */
   async function addTileTypeFromImage(name, dataUrl) {
-    if (!hasMap.value) return '请先创建或打开地图'
-    if (tileTypes.value.length >= 256) return '块类型过多（≤256）'
-    const baseName = String(name ?? '').trim() || `块 ${tileTypes.value.length}`
+    if (!hasMap.value) return te('errors.tileMap.needMapOrOpen')
+    if (tileTypes.value.length >= 256)
+      return te('errors.tileMap.tooManyTileTypes')
+    const baseName =
+      String(name ?? '').trim() || te('tile.unnamed', tileTypes.value.length)
     let color
     try {
       color = await averageColorFromDataUrl(dataUrl)
     } catch {
-      return '图片解析失败'
+      return te('errors.tileMap.imageDecodeFailed')
     }
     const id = tileTypes.value.length
     const defTex = Math.max(
@@ -811,10 +824,11 @@ export function useTileMap() {
    * }} patch
    */
   function updateTileType(id, patch) {
-    if (id < 0 || id >= tileTypes.value.length) return '无效的块 id'
+    if (id < 0 || id >= tileTypes.value.length)
+      return te('errors.tileMap.invalidBlockId')
     const t = tileTypes.value[id]
     const name = patch.name != null ? String(patch.name).trim() : t.name
-    if (!name) return '名称不能为空'
+    if (!name) return te('errors.tileMap.emptyName')
     let color = t.color
     let imageDataUrl = t.imageDataUrl ?? null
     let collisionType = t.collisionType === 'block' ? 'block' : 'none'
@@ -837,7 +851,8 @@ export function useTileMap() {
           patch.color === null || patch.color === ''
             ? '#888888'
             : String(patch.color).trim()
-        if (!/^#[0-9a-fA-F]{6}$/.test(c)) return '颜色须为 #RRGGBB'
+        if (!/^#[0-9a-fA-F]{6}$/.test(c))
+          return te('errors.tileMap.colorMustHex')
         color = c
       }
       if (patch.imageDataUrl !== undefined) {
@@ -845,13 +860,15 @@ export function useTileMap() {
           imageDataUrl = null
         } else {
           const u = String(patch.imageDataUrl)
-          if (!u.startsWith('data:image/')) return 'imageDataUrl 须为 data:image/*'
+          if (!u.startsWith('data:image/'))
+            return te('errors.tileMap.imageDataUrlMustData')
           imageDataUrl = u
         }
       }
       if (patch.collisionType !== undefined) {
         const c = patch.collisionType
-        if (c !== 'none' && c !== 'block') return 'collisionType 须为 none 或 block'
+        if (c !== 'none' && c !== 'block')
+          return te('errors.tileMap.collisionTypeInvalid')
         collisionType = c
       }
       if (patch.transparentColor !== undefined) {
@@ -859,7 +876,8 @@ export function useTileMap() {
           transparentColor = null
         } else {
           const tc = String(patch.transparentColor).trim()
-          if (!/^#[0-9a-fA-F]{6}$/.test(tc)) return 'transparentColor 须为 #RRGGBB'
+          if (!/^#[0-9a-fA-F]{6}$/.test(tc))
+            return te('errors.tileMap.transparentColorInvalid')
           transparentColor = tc.toUpperCase()
         }
       }
@@ -869,7 +887,7 @@ export function useTileMap() {
         } else {
           const tw = Math.floor(Number(patch.textureWidth))
           if (!Number.isFinite(tw) || tw < 8 || tw > 128) {
-            return 'textureWidth 须在 8～128 或留空'
+            return te('errors.tileMap.textureWidthRange')
           }
           textureWidth = tw
         }
@@ -880,7 +898,7 @@ export function useTileMap() {
         } else {
           const th = Math.floor(Number(patch.textureHeight))
           if (!Number.isFinite(th) || th < 8 || th > 128) {
-            return 'textureHeight 须在 8～128 或留空'
+            return te('errors.tileMap.textureHeightRange')
           }
           textureHeight = th
         }
@@ -888,7 +906,7 @@ export function useTileMap() {
       if (patch.colorDepthMode !== undefined) {
         const m = patch.colorDepthMode
         if (m !== 'rgba8' && m !== 'indexed8') {
-          return 'colorDepthMode 须为 rgba8 或 indexed8'
+          return te('errors.tileMap.colorDepthModeInvalid')
         }
         colorDepthMode = m
       }
@@ -913,10 +931,10 @@ export function useTileMap() {
 
   /** 删除指定 id 的块类型（id 0 不可删）；图层中该 id 置空，更大 id 减一。 */
   function deleteTileType(id) {
-    if (id === 0) return '不能删除「空」类型'
+    if (id === 0) return te('errors.tileMap.cannotDeleteEmpty')
     const n = tileTypes.value.length
-    if (id < 0 || id >= n) return '无效的块 id'
-    if (n <= 1) return '至少保留一个类型'
+    if (id < 0 || id >= n) return te('errors.tileMap.invalidBlockId')
+    if (n <= 1) return te('errors.tileMap.atLeastOneType')
     const next = tileTypes.value
       .filter((_, i) => i !== id)
       .map((t, i) => ({ ...t, id: i }))

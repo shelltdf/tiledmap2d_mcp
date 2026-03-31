@@ -1,5 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 
 const props = defineProps({
   label: { type: String, required: true },
@@ -21,6 +24,13 @@ defineEmits(['expand'])
 const edgeKind = computed(() =>
   props.placement === 'top' || props.placement === 'bottom' ? 'tb' : 'lr',
 )
+
+const titleComputed = computed(() =>
+  props.expandTitle || t('docks.expandDock', props.label),
+)
+const ariaComputed = computed(() =>
+  props.ariaLabel || t('docks.expandDockAria', props.label),
+)
 </script>
 
 <template>
@@ -28,8 +38,8 @@ const edgeKind = computed(() =>
     type="button"
     class="dock-edge-btn win-btn"
     :class="edgeKind === 'lr' ? 'dock-edge-btn--lr' : 'dock-edge-btn--tb'"
-    :title="expandTitle || `展开${label}`"
-    :aria-label="ariaLabel || `展开${label}停靠面板`"
+    :title="titleComputed"
+    :aria-label="ariaComputed"
     @click="$emit('expand')"
   >
     {{ label }}

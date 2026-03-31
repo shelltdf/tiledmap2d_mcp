@@ -1,4 +1,5 @@
 import pako from 'pako'
+import { te } from '../i18n/te.js'
 
 /** Tiled GID 翻转标志（正交地图） */
 const FLIPPED_HORIZONTALLY_FLAG = 0x80000000
@@ -90,7 +91,9 @@ function parseBase64ZlibGids(base64Text, expectedCount) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   const inflated = pako.inflate(bytes)
   if (inflated.length !== expectedCount * 4) {
-    throw new Error(`解压后长度 ${inflated.length}，期望 ${expectedCount * 4}`)
+    throw new Error(
+      te('errors.tmx.zlibLength', inflated.length, expectedCount * 4),
+    )
   }
   const dv = new DataView(
     inflated.buffer,
@@ -128,17 +131,19 @@ function parseLayerDataElement(dataEl, width, height, firstGid, maxTileTypeCount
       try {
         flat = parseBase64ZlibGids(raw, expected)
       } catch (e) {
-        throw new Error(`解析 base64/zlib 失败：${e.message ?? e}`)
+        throw new Error(te('errors.tmx.base64ZlibFailed', e.message ?? e))
       }
     } else {
-      throw new Error(`不支持的 compression：${compression || '无'}`)
+      throw new Error(
+        te('errors.tmx.compressionUnsupported', compression || '—'),
+      )
     }
   } else {
-    throw new Error(`不支持的 data encoding：${encoding || '无'}（支持 csv、base64+zlib）`)
+    throw new Error(te('errors.tmx.encodingUnsupported', encoding || '—'))
   }
 
   if (flat.length !== expected) {
-    throw new Error(`图层格子数 ${flat.length} 与 width*height=${expected} 不符`)
+    throw new Error(te('errors.tmx.cellCountMismatch', flat.length, expected))
   }
 
   const tiles = []
@@ -148,7 +153,7 @@ function parseLayerDataElement(dataEl, width, height, firstGid, maxTileTypeCount
       const gid = flat[gy * width + gx]
       const id = gidToEditorTileId(gid, firstGid)
       if (!Number.isInteger(id) || id < 0 || id >= maxTileTypeCount) {
-        throw new Error(`非法瓦片 id（${gx},${gy}）：gid=${gid} → ${id}`)
+        throw new Error(te('errors.tmx.invalidTileId', gx, gy, gid, id))
       }
       row.push(id)
     }
@@ -165,40 +170,46 @@ export function parseTmxToMapPayload(xmlText, maxTileTypeCount) {
   const doc = parser.parseFromString(xmlText, 'application/xml')
   const err = doc.querySelector('parsererror')
   if (err) {
-    return 'TMX XML 解析失败'
+    return te('errors.tmx.xmlParseFailed')
   }
   const mapEl = doc.querySelector('map')
-  if (!mapEl) return '缺少 map 元素'
+  if (!mapEl) return te('errors.tmx.missingMapElement')
 
   if (mapEl.getAttribute('orientation') !== 'orthogonal') {
-    return '仅支持 orientation=orthogonal'
+    return te('errors.tmx.orientationOnlyOrthogonal')
   }
   if (mapEl.getAttribute('infinite') === '1') {
-    return '不支持 infinite=1 地图'
+    return te('errors.tmx.infiniteNotSupported')
   }
 
   const width = parseInt(mapEl.getAttribute('width') ?? '', 10)
   const height = parseInt(mapEl.getAttribute('height') ?? '', 10)
   const tileSize = parseInt(mapEl.getAttribute('tilewidth') ?? '', 10)
   const th = parseInt(mapEl.getAttribute('tileheight') ?? '', 10)
-  if (!Number.isInteger(width) || width < 1 || width > 256) return 'map width 无效'
-  if (!Number.isInteger(height) || height < 1 || height > 256) return 'map height 无效'
-  if (!Number.isInteger(tileSize) || tileSize < 8 || tileSize > 128) return 'tilewidth 无效'
-  if (!Number.isInteger(th) || th !== tileSize) return 'tilewidth 与 tileheight 须一致'
+  if (!Number.isInteger(width) || width < 1 || width > 256)
+    return te('errors.tmx.mapWidthInvalid')
+  if (!Number.isInteger(height) || height < 1 || height > 256)
+    return te('errors.tmx.mapHeightInvalid')
+  if (!Number.isInteger(tileSize) || tileSize < 8 || tileSize > 128)
+    return te('errors.tmx.tileWidthInvalid')
+  if (!Number.isInteger(th) || th !== tileSize)
+    return te('errors.tmx.tileWidthHeightMismatch')
 
   const tilesetEl = doc.querySelector('tileset')
   const firstGid = parseInt(tilesetEl?.getAttribute('firstgid') ?? '1', 10)
-  if (!Number.isInteger(firstGid) || firstGid < 1) return 'tileset firstgid 无效'
+  if (!Number.isInteger(firstGid) || firstGid < 1)
+    return te('errors.tmx.firstGidInvalid')
 
   const layerEls = Array.from(mapEl.children).filter((n) => n.tagName === 'layer')
-  if (layerEls.length === 0) return '未找到 tile layer'
+  if (layerEls.length === 0) return te('errors.tmx.noTileLayer')
 
   const layersOut = []
   for (let li = 0; li < layerEls.length; li++) {
     const layerEl = layerEls[li]
     const dataEl = layerEl.querySelector('data')
-    if (!dataEl) return `图层 ${li + 1} 缺少 data`
-    const name = layerEl.getAttribute('name') ?? `图层 ${li + 1}`
+    if (!dataEl) return te('errors.tmx.layerMissingData', li + 1)
+    const name =
+      layerEl.getAttribute('name') ?? te('layer.unnamed', li + 1)
     const visible = layerEl.getAttribute('visible') !== '0'
     try {
       const tiles = parseLayerDataElement(
@@ -214,7 +225,7 @@ export function parseTmxToMapPayload(xmlText, maxTileTypeCount) {
         tiles,
       })
     } catch (e) {
-      return `图层 «${name}»：${e.message ?? e}`
+      return te('errors.tmx.layerParseError', name, e.message ?? e)
     }
   }
 

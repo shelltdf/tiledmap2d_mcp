@@ -1,5 +1,8 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, inject } from 'vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 
 const props = defineProps({
   types: { type: Array, required: true },
@@ -56,10 +59,11 @@ const resolutionText = computed(() => {
 })
 
 const colorDepthDisplay = computed(() => {
+  shell?.locale?.value
   if (!block.value) return '—'
   return block.value.colorDepthMode === 'indexed8'
-    ? '索引色（8 位）'
-    : '真彩色 RGBA'
+    ? t('blockDef.indexed')
+    : t('blockDef.rgba')
 })
 
 function onPreviewImgLoad(e) {
@@ -78,14 +82,14 @@ watch(
 </script>
 
 <template>
-  <aside class="dock dock--fill win-panel" aria-label="块定义">
+  <aside class="dock dock--fill win-panel" :aria-label="t('blockDef.title')">
     <div class="dock-head">
-      <div class="dock-title">块定义</div>
+      <div class="dock-title">{{ t('blockDef.title') }}</div>
       <button
         type="button"
         class="dock-collapse-btn"
-        title="折叠到右缘"
-        aria-label="折叠块定义停靠面板"
+        :title="t('blockDef.collapseTitle')"
+        :aria-label="t('blockDef.collapseAria')"
         @click="emit('collapse')"
       >
         ⟩
@@ -93,24 +97,24 @@ watch(
     </div>
     <div v-if="block" class="def-body">
       <div class="field">
-        <span class="label">ID</span>
+        <span class="label">{{ t('blockDef.id') }}</span>
         <span class="value mono">{{ block.id }}</span>
       </div>
       <div class="field">
-        <span class="label">名称</span>
+        <span class="label">{{ t('blockDef.name') }}</span>
         <span class="value">{{ block.name }}</span>
       </div>
       <div class="field">
-        <span class="label">分辨率</span>
+        <span class="label">{{ t('blockDef.resolution') }}</span>
         <span class="value mono">{{ resolutionText }}</span>
       </div>
       <div class="field">
-        <span class="label">色彩模式</span>
+        <span class="label">{{ t('blockDef.colorMode') }}</span>
         <span class="value">{{ colorDepthDisplay }}</span>
       </div>
       <div class="field field--preview">
-        <span class="label">颜色</span>
-        <div class="preview-box" title="1 像素 = 1 显示像素">
+        <span class="label">{{ t('blockDef.color') }}</span>
+        <div class="preview-box" :title="t('blockDef.previewTitle')">
           <img
             v-if="block.imageDataUrl"
             class="preview-img"
@@ -124,14 +128,16 @@ watch(
             class="preview-solid"
             :style="{ background: block.color }"
           />
-          <span v-else class="preview-empty value muted">（透明格 / 空）</span>
+          <span v-else class="preview-empty value muted">{{
+            t('blockDef.previewEmpty')
+          }}</span>
         </div>
       </div>
       <p class="hint">
-        在「块库」中可导入 / 编辑 / 删除类型；绘制时选中其一作为当前笔刷。
+        {{ t('blockDef.hint') }}
       </p>
     </div>
-    <p v-else class="hint">在块库中选择一个块以查看定义。</p>
+    <p v-else class="hint">{{ t('blockDef.hintNoSelection') }}</p>
   </aside>
 </template>
 

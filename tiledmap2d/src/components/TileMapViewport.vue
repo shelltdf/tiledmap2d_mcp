@@ -1,7 +1,10 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick, inject } from 'vue'
 import CanvasToolsBar from './CanvasToolsBar.vue'
 import CanvasDisplayPanel from './CanvasDisplayPanel.vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 
 const panning = ref(false)
 
@@ -878,9 +881,9 @@ onUnmounted(() => {
           class="viewport-no-map"
           aria-live="polite"
         >
-          <p class="viewport-no-map-title">当前没有地图</p>
+          <p class="viewport-no-map-title">{{ t('viewport.noMapTitle') }}</p>
           <p class="viewport-no-map-hint">
-            创建或打开地图后，将显示地图层与块库（块表由地图文件定义）。
+            {{ t('viewport.noMapHint') }}
           </p>
         </div>
       </div>
@@ -899,7 +902,10 @@ onUnmounted(() => {
           />
         </div>
         <div class="viewport-chrome-spacer" aria-hidden="true" />
-        <div class="viewport-chrome-right" aria-label="显示辅助">
+        <div
+          class="viewport-chrome-right"
+          :aria-label="t('viewport.chromeRightAria')"
+        >
           <CanvasDisplayPanel
             :show-grid="showGridOverlay"
             :show-origin="showOriginMarker"

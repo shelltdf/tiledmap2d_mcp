@@ -1,4 +1,6 @@
 <script setup>
+import { computed, inject } from 'vue'
+
 defineProps({
   activeTool: { type: String, required: true },
   /** 有地图时可清空图层内容 */
@@ -7,24 +9,31 @@ defineProps({
 
 const emit = defineEmits(['select', 'fit-view', 'actual-size', 'clear-map'])
 
-const tools = [
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
+
+const tools = computed(() => [
   {
     id: 'select',
-    label: '选择',
-    title: '选择：点选、Ctrl+点多选、拖框、Shift+拖框追加；右键清空选区（不改变块库）',
+    label: t('tools.select'),
+    title: t('tools.selectTitle'),
   },
   {
     id: 'pick',
-    label: '吸取',
-    title: '吸取：左键取当前编辑层该格的块到块库；任意时刻也可按住 Alt 临时吸取，松开还原',
+    label: t('tools.pick'),
+    title: t('tools.pickTitle'),
   },
   {
     id: 'fill',
-    label: '填充',
-    title: '填充：有选区时填充选区，无选区时仅填充点击的一格',
+    label: t('tools.fill'),
+    title: t('tools.fillTitle'),
   },
-  { id: 'eraser', label: '橡皮', title: '橡皮：擦除选区或单格' },
-]
+  {
+    id: 'eraser',
+    label: t('tools.eraser'),
+    title: t('tools.eraserTitle'),
+  },
+])
 
 function choose(id) {
   emit('select', id)
@@ -32,21 +41,21 @@ function choose(id) {
 </script>
 
 <template>
-  <div class="ctb win-panel" role="toolbar" aria-label="画布工具栏">
-    <div class="ctb-title">工具栏</div>
+  <div class="ctb win-panel" role="toolbar" :aria-label="t('tools.barAria')">
+    <div class="ctb-title">{{ t('tools.barTitle') }}</div>
     <button
-      v-for="t in tools"
-      :key="t.id"
+      v-for="tool in tools"
+      :key="tool.id"
       type="button"
       class="ctb-btn"
-      :class="{ active: activeTool === t.id }"
-      :title="t.title"
-      :aria-label="t.title"
-      @click="choose(t.id)"
+      :class="{ active: activeTool === tool.id }"
+      :title="tool.title"
+      :aria-label="tool.title"
+      @click="choose(tool.id)"
     >
       <span class="ctb-btn-inner">
         <svg
-          v-if="t.id === 'select'"
+          v-if="tool.id === 'select'"
           class="ctb-ico"
           viewBox="0 0 24 24"
           aria-hidden="true"
@@ -57,7 +66,7 @@ function choose(id) {
           />
         </svg>
         <svg
-          v-else-if="t.id === 'pick'"
+          v-else-if="tool.id === 'pick'"
           class="ctb-ico"
           viewBox="0 0 24 24"
           aria-hidden="true"
@@ -72,7 +81,7 @@ function choose(id) {
           />
         </svg>
         <svg
-          v-else-if="t.id === 'fill'"
+          v-else-if="tool.id === 'fill'"
           class="ctb-ico"
           viewBox="0 0 24 24"
           aria-hidden="true"
@@ -98,15 +107,15 @@ function choose(id) {
             opacity="0.65"
           />
         </svg>
-        <span class="ctb-lbl">{{ t.label }}</span>
+        <span class="ctb-lbl">{{ tool.label }}</span>
       </span>
     </button>
     <div class="ctb-sep" role="separator" aria-hidden="true" />
     <button
       type="button"
       class="ctb-btn ctb-btn--danger"
-      title="清空地图（确认后清除所有图层上的绘制）"
-      aria-label="清空地图"
+      :title="t('tools.clearMapTitle')"
+      :aria-label="t('tools.clearMapAria')"
       :disabled="!mapReady"
       @click="emit('clear-map')"
     >
@@ -121,15 +130,15 @@ function choose(id) {
             d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"
           />
         </svg>
-        <span class="ctb-lbl">清空</span>
+        <span class="ctb-lbl">{{ t('tools.clearMap') }}</span>
       </span>
     </button>
     <div class="ctb-sep" role="separator" aria-hidden="true" />
     <button
       type="button"
       class="ctb-btn"
-      title="适应窗口（Fit）"
-      aria-label="适应窗口"
+      :title="t('tools.fitTitle')"
+      :aria-label="t('tools.fitAria')"
       @click="emit('fit-view')"
     >
       <span class="ctb-btn-inner">
@@ -139,14 +148,14 @@ function choose(id) {
             d="M4 8V4h4M16 4h4v4M4 16v4h4M16 20h4v-4M8 8h8v8H8V8z"
           />
         </svg>
-        <span class="ctb-lbl">适应</span>
+        <span class="ctb-lbl">{{ t('tools.fit') }}</span>
       </span>
     </button>
     <button
       type="button"
       class="ctb-btn"
-      title="1:1（100% 缩放，以视口中心为锚）"
-      aria-label="1:1 实际大小，视口中心缩放"
+      :title="t('tools.actualTitle')"
+      :aria-label="t('tools.actualAria')"
       @click="emit('actual-size')"
     >
       <span class="ctb-btn-inner">

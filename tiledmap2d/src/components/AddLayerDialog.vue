@@ -1,5 +1,8 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, inject } from 'vue'
+
+const shell = inject('appShell', null)
+const t = (path, ...args) => shell?.t?.(path, ...args) ?? path
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -46,33 +49,47 @@ function onCancel() {
         @keydown.escape.prevent="onCancel"
       >
         <div class="dlg-head">
-          <h2 id="add-layer-title" class="dlg-title">添加图层</h2>
-          <button type="button" class="win-btn" @click="onCancel">取消</button>
+          <h2 id="add-layer-title" class="dlg-title">{{ t('addLayer.title') }}</h2>
+          <button type="button" class="win-btn" @click="onCancel">
+            {{ t('common.cancel') }}
+          </button>
         </div>
         <div class="dlg-body">
           <div class="field">
-            <div class="label">层类型</div>
+            <div class="label">{{ t('addLayer.kind') }}</div>
             <select v-model="kind" class="sel">
-              <option value="tile">Tile</option>
-              <option value="image">Sprite</option>
-              <option value="area">Location</option>
+              <option value="tile">{{ t('layerKind.tile') }}</option>
+              <option value="image">{{ t('layerKind.sprite') }}</option>
+              <option value="area">{{ t('layerKind.location') }}</option>
             </select>
           </div>
           <div class="field">
-            <div class="label">插入位置</div>
+            <div class="label">{{ t('addLayer.insert') }}</div>
             <div class="radios">
-              <label><input v-model="insert" type="radio" value="above" /> 当前层之上</label>
-              <label><input v-model="insert" type="radio" value="below" /> 当前层之下</label>
-              <label><input v-model="insert" type="radio" value="top" /> 最上层</label>
-              <label><input v-model="insert" type="radio" value="bottom" /> 最下层</label>
+              <label
+                ><input v-model="insert" type="radio" value="above" />
+                {{ t('addLayer.above') }}</label
+              >
+              <label
+                ><input v-model="insert" type="radio" value="below" />
+                {{ t('addLayer.below') }}</label
+              >
+              <label
+                ><input v-model="insert" type="radio" value="top" />
+                {{ t('addLayer.top') }}</label
+              >
+              <label
+                ><input v-model="insert" type="radio" value="bottom" />
+                {{ t('addLayer.bottom') }}</label
+              >
             </div>
           </div>
-          <p class="hint">
-            绘制与拾取仅作用于 <strong>Tile</strong> 与 <strong>Location</strong> 层；<strong>Sprite</strong> 层为占位叠色（精灵层，后续可接贴图）。
-          </p>
+          <p class="hint">{{ t('addLayer.hint') }}</p>
         </div>
         <div class="dlg-foot">
-          <button type="button" class="win-btn primary" @click="onOk">确定</button>
+          <button type="button" class="win-btn primary" @click="onOk">
+            {{ t('common.ok') }}
+          </button>
         </div>
       </div>
     </div>
