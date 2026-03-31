@@ -40,7 +40,7 @@ const emit = defineEmits(['close'])
               <li><code>tileSize</code>：单格像素边长（8～128）</li>
               <li><code>width</code> / <code>height</code>：地图宽高（格数，1～256）</li>
               <li>
-                <code>layers</code>（v2/v3）：数组；每项含 <code>name</code>、<code>visible</code>、<code>tiles</code>；v3 另有 <code>kind</code>：<code>tile</code>（Tile）、<code>image</code>（Sprite）、<code>area</code>（Area）；
+                <code>layers</code>（v2/v3）：数组；每项含 <code>name</code>、<code>visible</code>、<code>tiles</code>；v3 另有 <code>kind</code>：<code>tile</code>（Tile）、<code>image</code>（Sprite）、<code>area</code>（Location）；
                 另可有 <code>activeLayerIndex</code>
               </li>
               <li>

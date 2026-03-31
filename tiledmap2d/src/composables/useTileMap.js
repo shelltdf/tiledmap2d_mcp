@@ -451,7 +451,7 @@ export function useTileMap() {
       kind === 'image'
         ? `Sprite ${n}`
         : kind === 'area'
-          ? `Area ${n}`
+          ? `Location ${n}`
           : `Tile ${n}`
     const layer = createLayer(name, w, h, kind)
     const ai = activeLayerIndex.value

@@ -32,18 +32,18 @@ function onDrop(e, toIndex) {
   emit('reorder', { from, to: toIndex })
 }
 
-/** 角标：T / S / A */
+/** 角标：T / S / L */
 function kindBadge(layer) {
   const k = layer?.kind || 'tile'
   if (k === 'image') return 'S'
-  if (k === 'area') return 'A'
+  if (k === 'area') return 'L'
   return 'T'
 }
 
 function kindTitle(layer) {
   const k = layer?.kind || 'tile'
   if (k === 'image') return 'Sprite'
-  if (k === 'area') return 'Area'
+  if (k === 'area') return 'Location'
   return 'Tile'
 }
 </script>
