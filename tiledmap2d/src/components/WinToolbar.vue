@@ -1,42 +1,24 @@
 <script setup>
-import { ref, watch } from 'vue'
-
-const props = defineProps({
-  mapWidth: { type: Number, required: true },
-  mapHeight: { type: Number, required: true },
-})
-
-const emit = defineEmits(['new-map', 'clear', 'export', 'import', 'export-tmx', 'import-tmx'])
-
-const w = ref(String(props.mapWidth))
-const h = ref(String(props.mapHeight))
-
-watch(
-  () => props.mapWidth,
-  (v) => {
-    w.value = String(v)
-  }
-)
-watch(
-  () => props.mapHeight,
-  (v) => {
-    h.value = String(v)
-  }
-)
-
-function submitNew() {
-  emit('new-map', w.value, h.value)
-}
+const emit = defineEmits([
+  'open-new-map',
+  'open-map-settings',
+  'clear',
+  'export',
+  'import',
+  'export-tmx',
+  'import-tmx',
+])
 </script>
 
 <template>
   <div class="toolbar win-panel">
     <div class="tb-group">
-      <label class="tb-label">宽</label>
-      <input v-model="w" class="tb-input" type="number" min="1" max="256" />
-      <label class="tb-label">高</label>
-      <input v-model="h" class="tb-input" type="number" min="1" max="256" />
-      <button type="button" class="win-btn" @click="submitNew">新建地图</button>
+      <button type="button" class="win-btn" @click="emit('open-new-map')">
+        新建地图…
+      </button>
+      <button type="button" class="win-btn" @click="emit('open-map-settings')">
+        地图设置…
+      </button>
     </div>
     <div class="tb-sep" />
     <div class="tb-group">
@@ -94,19 +76,6 @@ function submitNew() {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.tb-label {
-  font-size: 12px;
-  color: var(--win-text-secondary);
-}
-.tb-input {
-  width: 56px;
-  padding: 4px 6px;
-  border: 1px solid var(--win-border);
-  border-radius: 4px;
-  font: inherit;
-  background: var(--win-surface);
-  color: var(--win-text);
 }
 .tb-sep {
   width: 1px;

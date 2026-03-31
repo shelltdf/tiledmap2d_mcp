@@ -19,32 +19,56 @@ function escapeXmlText(s) {
     .replace(/>/g, '&gt;')
 }
 
+function layerDataXml(name, layerId, tw, th, tiles, visibleAttr) {
+  const rows = []
+  for (let gy = 0; gy < th; gy++) {
+    rows.push(tiles[gy].join(','))
+  }
+  const csv = `${rows.join(',\n')}\n`
+  const vis = visibleAttr === false ? '0' : '1'
+  return ` <layer id="${layerId}" name="${escapeXmlText(name)}" width="${tw}" height="${th}" visible="${vis}">
+  <data encoding="csv">
+${csv}  </data>
+ </layer>`
+}
+
 /**
- * 导出 TMX（正交、单层、与内置调色板兼容：firstgid=1，gid 0 为空，gid 1..5 对应瓦片 id 1..5）
- * 图层为 CSV。tileset 引用同目录 tilemap-palette.png（5×1 瓦片图块）。
+ * 导出 TMX（正交、多图层、与内置块库兼容：firstgid=1，gid 0 为空，gid 1..5 对应瓦片 id 1..5）
+ * 每个图层为 CSV。tileset 引用同目录 tilemap-palette.png（5×1 瓦片图块）。
  */
-export function exportTmx({ width, height, tileSize, tiles, paletteFileName = 'tilemap-palette.png' }) {
+export function exportTmx({
+  width,
+  height,
+  tileSize,
+  layers,
+  paletteFileName = 'tilemap-palette.png',
+}) {
   const tw = width
   const th = height
   const ts = tileSize
   const tilecount = 5
   const imgW = tilecount * ts
   const imgH = ts
-  const rows = []
-  for (let gy = 0; gy < th; gy++) {
-    rows.push(tiles[gy].join(','))
+  const list = Array.isArray(layers) && layers.length > 0 ? layers : []
+  const nextlayerid = list.length + 1
+
+  let body = ''
+  const emptyGrid = () =>
+    Array.from({ length: th }, () => Array.from({ length: tw }, () => 0))
+  for (let i = 0; i < list.length; i++) {
+    const L = list[i]
+    const name = L.name ?? `Layer ${i + 1}`
+    const vis = L.visible !== false
+    const tiles =
+      L.kind === 'image' ? emptyGrid() : L.tiles
+    body += layerDataXml(String(name), i + 1, tw, th, tiles, vis)
   }
-  const csv = `${rows.join(',\n')}\n`
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="${tw}" height="${th}" tilewidth="${ts}" tileheight="${ts}" infinite="0" nextlayerid="2" nextobjectid="1">
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="${tw}" height="${th}" tilewidth="${ts}" tileheight="${ts}" infinite="0" nextlayerid="${nextlayerid}" nextobjectid="1">
  <tileset firstgid="1" name="editor-palette" tilewidth="${ts}" tileheight="${ts}" spacing="0" margin="0" tilecount="${tilecount}" columns="${tilecount}">
   <image source="${escapeXmlText(paletteFileName)}" width="${imgW}" height="${imgH}"/>
- </tileset>
- <layer id="1" name="Tile Layer 1" width="${tw}" height="${th}">
-  <data encoding="csv">
-${csv}  </data>
- </layer>
+ </tileset>${body}
 </map>
 `
 }
@@ -89,8 +113,52 @@ export function gidToEditorTileId(gid, firstGid) {
   return g - firstGid + 1
 }
 
+function parseLayerDataElement(dataEl, width, height, firstGid, maxTileTypeCount) {
+  const encoding = dataEl.getAttribute('encoding') ?? ''
+  const compression = dataEl.getAttribute('compression') ?? ''
+  const expected = width * height
+  let flat
+
+  if (encoding === 'csv') {
+    const text = dataEl.textContent ?? ''
+    flat = parseCsvGids(text)
+  } else if (encoding === 'base64') {
+    const raw = (dataEl.textContent ?? '').replace(/\s/g, '')
+    if (compression === 'zlib' || compression === '') {
+      try {
+        flat = parseBase64ZlibGids(raw, expected)
+      } catch (e) {
+        throw new Error(`解析 base64/zlib 失败：${e.message ?? e}`)
+      }
+    } else {
+      throw new Error(`不支持的 compression：${compression || '无'}`)
+    }
+  } else {
+    throw new Error(`不支持的 data encoding：${encoding || '无'}（支持 csv、base64+zlib）`)
+  }
+
+  if (flat.length !== expected) {
+    throw new Error(`图层格子数 ${flat.length} 与 width*height=${expected} 不符`)
+  }
+
+  const tiles = []
+  for (let gy = 0; gy < height; gy++) {
+    const row = []
+    for (let gx = 0; gx < width; gx++) {
+      const gid = flat[gy * width + gx]
+      const id = gidToEditorTileId(gid, firstGid)
+      if (!Number.isInteger(id) || id < 0 || id >= maxTileTypeCount) {
+        throw new Error(`非法瓦片 id（${gx},${gy}）：gid=${gid} → ${id}`)
+      }
+      row.push(id)
+    }
+    tiles.push(row)
+  }
+  return tiles
+}
+
 /**
- * 解析 TMX XML，返回 { width, height, tileSize, tiles } 或抛出/返回错误串由调用方处理
+ * 解析 TMX XML，返回 { version: 2, width, height, tileSize, layers, activeLayerIndex } 或错误串
  */
 export function parseTmxToMapPayload(xmlText, maxTileTypeCount) {
   const parser = new DOMParser()
@@ -122,56 +190,40 @@ export function parseTmxToMapPayload(xmlText, maxTileTypeCount) {
   const firstGid = parseInt(tilesetEl?.getAttribute('firstgid') ?? '1', 10)
   if (!Number.isInteger(firstGid) || firstGid < 1) return 'tileset firstgid 无效'
 
-  const layerEl = doc.querySelector('layer > data')?.parentElement ?? doc.querySelector('layer')
-  const dataEl = layerEl?.querySelector('data')
-  if (!dataEl) return '未找到图层 data'
+  const layerEls = Array.from(mapEl.children).filter((n) => n.tagName === 'layer')
+  if (layerEls.length === 0) return '未找到 tile layer'
 
-  const encoding = dataEl.getAttribute('encoding') ?? ''
-  const compression = dataEl.getAttribute('compression') ?? ''
-  const expected = width * height
-  let flat
-
-  if (encoding === 'csv') {
-    const text = dataEl.textContent ?? ''
-    flat = parseCsvGids(text)
-  } else if (encoding === 'base64') {
-    const raw = (dataEl.textContent ?? '').replace(/\s/g, '')
-    if (compression === 'zlib' || compression === '') {
-      try {
-        flat = parseBase64ZlibGids(raw, expected)
-      } catch (e) {
-        return `解析 base64/zlib 失败：${e.message ?? e}`
-      }
-    } else {
-      return `不支持的 compression：${compression || '无'}`
+  const layersOut = []
+  for (let li = 0; li < layerEls.length; li++) {
+    const layerEl = layerEls[li]
+    const dataEl = layerEl.querySelector('data')
+    if (!dataEl) return `图层 ${li + 1} 缺少 data`
+    const name = layerEl.getAttribute('name') ?? `图层 ${li + 1}`
+    const visible = layerEl.getAttribute('visible') !== '0'
+    try {
+      const tiles = parseLayerDataElement(
+        dataEl,
+        width,
+        height,
+        firstGid,
+        maxTileTypeCount
+      )
+      layersOut.push({
+        name,
+        visible,
+        tiles,
+      })
+    } catch (e) {
+      return `图层 «${name}»：${e.message ?? e}`
     }
-  } else {
-    return `不支持的 data encoding：${encoding || '无'}（支持 csv、base64+zlib）`
-  }
-
-  if (flat.length !== expected) {
-    return `图层格子数 ${flat.length} 与 width*height=${expected} 不符`
-  }
-
-  const tiles = []
-  for (let gy = 0; gy < height; gy++) {
-    const row = []
-    for (let gx = 0; gx < width; gx++) {
-      const gid = flat[gy * width + gx]
-      const id = gidToEditorTileId(gid, firstGid)
-      if (!Number.isInteger(id) || id < 0 || id >= maxTileTypeCount) {
-        return `非法瓦片 id（${gx},${gy}）：gid=${gid} → ${id}`
-      }
-      row.push(id)
-    }
-    tiles.push(row)
   }
 
   return {
-    version: 1,
+    version: 2,
     tileSize,
     width,
     height,
-    tiles,
+    activeLayerIndex: 0,
+    layers: layersOut,
   }
 }

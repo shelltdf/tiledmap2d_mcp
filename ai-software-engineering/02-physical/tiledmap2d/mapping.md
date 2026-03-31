@@ -2,9 +2,13 @@
 
 | 元素 | 路径 |
 |------|------|
-| 地图状态与 JSON | `tiledmap2d/src/composables/useTileMap.js` |
-| 画布绘制与命中 | `tiledmap2d/src/components/TileMapViewport.vue` |
-| 调色板 | `tiledmap2d/src/components/TilePalette.vue` |
+| 地图状态、多层与 JSON | `tiledmap2d/src/composables/useTileMap.js` |
+| 画布多层绘制与命中 | `tiledmap2d/src/components/TileMapViewport.vue` |
+| 地图层 dock（添加对话框、拖拽排序） | `tiledmap2d/src/components/MapLayersDock.vue` |
+| 添加图层对话框 | `tiledmap2d/src/components/AddLayerDialog.vue` |
+| 画布旁显示辅助面板 | `tiledmap2d/src/components/CanvasDisplayPanel.vue` |
+| 块库（原调色板组件） | `tiledmap2d/src/components/TilePalette.vue` |
+| 块定义 dock | `tiledmap2d/src/components/BlockDefinitionDock.vue` |
 | 工具栏（新建/导入导出） | `tiledmap2d/src/components/WinToolbar.vue` |
 | 主菜单 | `tiledmap2d/src/components/WinMenuBar.vue` |
 | 帮助：文件格式说明对话框 | `tiledmap2d/src/components/FormatsHelpDialog.vue` |
