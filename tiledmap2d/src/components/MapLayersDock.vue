@@ -1,5 +1,7 @@
 <script setup>
 defineProps({
+  /** 已创建或打开过地图 */
+  mapReady: { type: Boolean, default: true },
   layers: { type: Array, required: true },
   activeIndex: { type: Number, required: true },
 })
@@ -65,6 +67,7 @@ function kindTitle(layer) {
         type="button"
         class="win-btn btn-sm"
         title="添加图层"
+        :disabled="!mapReady"
         @click="emit('open-add-dialog')"
       >
         添加
@@ -73,6 +76,7 @@ function kindTitle(layer) {
         type="button"
         class="win-btn btn-sm"
         title="重命名当前选中图层"
+        :disabled="!mapReady"
         @click="emit('rename-active')"
       >
         改名
@@ -81,7 +85,7 @@ function kindTitle(layer) {
         type="button"
         class="win-btn btn-sm btn-danger"
         title="删除当前选中图层"
-        :disabled="layers.length <= 1"
+        :disabled="!mapReady || layers.length <= 1"
         @click="emit('remove-active')"
       >
         删除
@@ -90,7 +94,9 @@ function kindTitle(layer) {
     <ul
       class="layer-list"
       role="listbox"
-      :aria-activedescendant="'layer-' + activeIndex"
+      :aria-activedescendant="
+        layers.length ? 'layer-' + activeIndex : undefined
+      "
     >
       <li
         v-for="(layer, index) in layers"

@@ -29,6 +29,11 @@ const showOriginMarker = ref(false)
 const showCollisionVolume = ref(true)
 const importJsonEl = ref(null)
 const importTmxEl = ref(null)
+/** 另存/保存目标（File System Access API）；来自 `<input type=file>` 的打开无此句柄 */
+const mapFileHandle = ref(null)
+const mapFileSuggestedName = ref('tiledmap2d.json')
+/** 菜单「打开」在回退到 `<input type=file>` 前已确认过，避免 onImport 二次确认 */
+const skipImportConfirm = ref(false)
 
 /** Dock：折叠后按钮在靠边「缘条」，与中间「显示区」兄弟排列；多 Dock 共享显示区高度 */
 const dockMapLayersCollapsed = ref(false)
@@ -44,10 +49,14 @@ const rightDockEdgeActive = computed(
 
 const statusMessage = computed(() => {
   if (tm.lastError) return tm.lastError
-  return '就绪 — 左键绘制，右键擦除；中键拖动画布平移；选择工具下左键拾取格中块；块库左键选块；滚轮缩放以指针为中心；画布聚焦时按住空格临时选择、松开恢复；方向键平移视口；支持 JSON / TMX（Tiled）'
+  if (!tm.hasMap) {
+    return '当前无地图 — 请使用菜单「文件 → 新建」或「打开…」；有地图后才会显示块库（块表随地图文件）；支持保存为 JSON 与 TMX（Tiled）'
+  }
+  return '就绪 — 填充/橡皮：左键填充选区或单格（无选区时仅当前格），右键擦除；选择：点选、Ctrl+点多选、拖框选、Shift+拖框追加；中键平移；块库选笔刷；空格临时切换选择；方向键平移视口；支持 JSON / TMX'
 })
 
 const cursorText = computed(() => {
+  if (!tm.hasMap) return '无地图'
   const c = tm.cursorCell
   if (!c) return ''
   const layer = tm.activeLayerName ? ` | ${tm.activeLayerName}` : ''
@@ -55,10 +64,6 @@ const cursorText = computed(() => {
 })
 
 const zoomText = computed(() => `${tm.zoomPercent}%`)
-
-function onPaint(gx, gy, id) {
-  tm.setTile(gx, gy, id)
-}
 
 function onCursor(cell) {
   tm.cursorCell = cell
@@ -185,9 +190,35 @@ function onLayerRemoveActive() {
   tm.removeLayer(index)
 }
 
-function onPickTile({ gx, gy, tileId }) {
-  tm.setPickedCell(gx, gy)
-  tm.setSelectedTileId(tileId)
+function onClearMap() {
+  if (!tm.hasMap) return
+  if (
+    !window.confirm(
+      '确定清空地图？所有图层上的绘制将被清除并恢复为默认空白地图，此操作不可撤销。',
+    )
+  ) {
+    return
+  }
+  tm.clearMap()
+}
+
+function onSelectionChange({ cells, paletteTileId }) {
+  tm.setSelection(cells)
+  if (paletteTileId != null) tm.setSelectedTileId(paletteTileId)
+}
+
+function onSelectionAdd({ cells, paletteTileId }) {
+  tm.addCellsToSelection(cells)
+  if (paletteTileId != null) tm.setSelectedTileId(paletteTileId)
+}
+
+function onSelectionToggle({ cell, paletteTileId }) {
+  tm.toggleCellInSelection(cell.gx, cell.gy)
+  if (paletteTileId != null) tm.setSelectedTileId(paletteTileId)
+}
+
+function onApplyTiles({ cells, tileId }) {
+  tm.fillCells(cells, tileId)
 }
 
 function openNewMapDialog() {
@@ -202,36 +233,186 @@ function openEditMapSettingsDialog() {
 
 function onMapSettingsConfirm({ width, height, tileSize }) {
   if (mapSettingsMode.value === 'edit') {
+    const w = tm.width
+    const h = tm.height
+    const ts = tm.tileSize
+    if (
+      (width !== w || height !== h || tileSize !== ts) &&
+      !window.confirm(
+        '应用新地图尺寸将按新宽高裁剪或扩展各图层，可能改变已有绘制。是否继续？',
+      )
+    ) {
+      return
+    }
     tm.applyMapSettings(width, height, tileSize)
   } else {
+    if (
+      tm.hasMap &&
+      !window.confirm(
+        '将创建新地图并替换当前地图（含全部图层与绘制），此操作不可撤销。是否继续？',
+      )
+    ) {
+      return
+    }
     tm.newMap(width, height, tileSize)
+    mapFileHandle.value = null
   }
 }
 
-function onExport() {
-  const json = tm.exportMap()
+function downloadJsonFile(json, filename) {
   const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'tiledmap2d.json'
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+async function writeJsonToFileHandle(handle, text) {
+  const writable = await handle.createWritable()
+  await writable.write(text)
+  await writable.close()
+}
+
+/** 工具栏「另存为」与菜单「另存为…」：无 File System API 时回退为下载 */
+function onSaveAsDownload() {
+  const json = tm.exportMap()
+  if (json == null) {
+    tm.setError('当前没有可保存的地图')
+    return
+  }
+  downloadJsonFile(json, mapFileSuggestedName.value || 'tiledmap2d.json')
   tm.clearError()
 }
 
+async function onMenuSave() {
+  const json = tm.exportMap()
+  if (json == null) {
+    tm.setError('当前没有可保存的地图')
+    return
+  }
+  if (mapFileHandle.value && 'createWritable' in mapFileHandle.value) {
+    try {
+      await writeJsonToFileHandle(mapFileHandle.value, json)
+      tm.clearError()
+    } catch {
+      tm.setError('保存失败')
+    }
+    return
+  }
+  await onMenuSaveAs()
+}
+
+async function onMenuSaveAs() {
+  const json = tm.exportMap()
+  if (json == null) {
+    tm.setError('当前没有可保存的地图')
+    return
+  }
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: mapFileSuggestedName.value || 'tiledmap2d.json',
+        types: [
+          {
+            description: 'JSON 地图',
+            accept: { 'application/json': ['.json'] },
+          },
+        ],
+      })
+      await writeJsonToFileHandle(handle, json)
+      mapFileHandle.value = handle
+      mapFileSuggestedName.value = handle.name || 'tiledmap2d.json'
+      tm.clearError()
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+      onSaveAsDownload()
+    }
+    return
+  }
+  onSaveAsDownload()
+}
+
+function onMenuNew() {
+  mapSettingsMode.value = 'new'
+  mapSettingsOpen.value = true
+}
+
+async function onMenuOpen() {
+  if (
+    tm.hasMap &&
+    !window.confirm(
+      '打开文件将替换当前地图，未保存的更改将丢失。是否继续？',
+    )
+  ) {
+    return
+  }
+  if (typeof window.showOpenFilePicker === 'function') {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [
+          {
+            description: 'JSON 地图',
+            accept: { 'application/json': ['.json'] },
+          },
+        ],
+        excludeAcceptAllOption: false,
+        multiple: false,
+      })
+      const file = await handle.getFile()
+      const text = await file.text()
+      const err = tm.importMapJson(text)
+      if (err) {
+        tm.setError(err)
+        return
+      }
+      mapFileHandle.value = handle
+      mapFileSuggestedName.value = file.name || 'tiledmap2d.json'
+      tm.clearError()
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+      skipImportConfirm.value = true
+      importJsonEl.value?.click()
+    }
+    return
+  }
+  skipImportConfirm.value = true
+  importJsonEl.value?.click()
+}
+
 function onImport(file) {
+  const skip = skipImportConfirm.value
+  skipImportConfirm.value = false
+  if (
+    !skip &&
+    tm.hasMap &&
+    !window.confirm(
+      '打开文件将替换当前地图，未保存的更改将丢失。是否继续？',
+    )
+  ) {
+    return
+  }
   const reader = new FileReader()
   reader.onload = () => {
     const text = String(reader.result ?? '')
     const err = tm.importMapJson(text)
     if (err) tm.setError(err)
+    else {
+      mapFileHandle.value = null
+      mapFileSuggestedName.value = file.name || 'tiledmap2d.json'
+      tm.clearError()
+    }
   }
   reader.onerror = () => tm.setError('文件读取失败')
   reader.readAsText(file, 'UTF-8')
 }
 
 function onExportTmx() {
+  if (!tm.hasMap) {
+    tm.setError('当前没有可导出的地图')
+    return
+  }
   const xml = exportTmx({
     width: tm.width,
     height: tm.height,
@@ -254,6 +435,14 @@ function onExportTmx() {
 }
 
 function onImportTmx(file) {
+  if (
+    tm.hasMap &&
+    !window.confirm(
+      '导入 TMX 将替换当前地图，未保存的更改将丢失。是否继续？',
+    )
+  ) {
+    return
+  }
   const reader = new FileReader()
   reader.onload = () => {
     const text = String(reader.result ?? '')
@@ -264,13 +453,13 @@ function onImportTmx(file) {
     }
     const err = tm.importMapObject(r)
     if (err) tm.setError(err)
+    else {
+      mapFileHandle.value = null
+      tm.clearError()
+    }
   }
   reader.onerror = () => tm.setError('文件读取失败')
   reader.readAsText(file, 'UTF-8')
-}
-
-function onMenuImportJson() {
-  importJsonEl.value?.click()
 }
 
 function onMenuImportTmx() {
@@ -291,11 +480,13 @@ function onMenuShowFormats() {
     </header>
 
     <WinMenuBar
-      @export-json="onExport"
-      @import-json="onMenuImportJson"
+      @new-map="onMenuNew"
+      @open-json="onMenuOpen"
+      @save="onMenuSave"
+      @save-as="onMenuSaveAs"
       @export-tmx="onExportTmx"
       @import-tmx="onMenuImportTmx"
-      @clear="tm.clearMap"
+      @clear="onClearMap"
       @show-formats="onMenuShowFormats"
     />
 
@@ -358,11 +549,9 @@ function onMenuShowFormats() {
     />
 
     <WinToolbar
+      :map-ready="tm.hasMap"
       @open-new-map="openNewMapDialog"
       @open-map-settings="openEditMapSettingsDialog"
-      @clear="tm.clearMap"
-      @export="onExport"
-      @import="onImport"
       @export-tmx="onExportTmx"
       @import-tmx="onImportTmx"
     />
@@ -388,6 +577,7 @@ function onMenuShowFormats() {
         >
           <MapLayersDock
             v-show="!dockMapLayersCollapsed"
+            :map-ready="tm.hasMap"
             :layers="tm.layers"
             :active-index="tm.activeLayerIndex"
             @select="(i) => tm.setActiveLayer(i)"
@@ -404,6 +594,7 @@ function onMenuShowFormats() {
       </div>
       <div class="canvas-workspace">
         <TileMapViewport
+          :map-ready="tm.hasMap"
           :layers="tm.layers"
           :width="tm.width"
           :height="tm.height"
@@ -412,23 +603,29 @@ function onMenuShowFormats() {
           :selected-tile-id="tm.selectedTileId"
           :active-tool="tm.activeTool"
           :active-layer-index="tm.activeLayerIndex"
-          :picked-cell="tm.pickedCell"
+          :selected-cells="tm.selectedCells"
           :tile-types="tm.tileTypes"
           :show-grid-overlay="showGridOverlay"
           :show-origin-marker="showOriginMarker"
           :show-collision-volume="showCollisionVolume"
-          @paint="onPaint"
           @cursor="onCursor"
           @zoom-wheel="onZoomWheel"
           @tool="(t) => tm.setActiveTool(t)"
-          @pick-tile="onPickTile"
+          @selection-change="onSelectionChange"
+          @selection-add="onSelectionAdd"
+          @selection-toggle="onSelectionToggle"
+          @apply-tiles="onApplyTiles"
           @set-zoom="(z) => tm.setZoom(z)"
           @update:show-grid-overlay="(v) => (showGridOverlay = v)"
           @update:show-origin-marker="(v) => (showOriginMarker = v)"
           @update:show-collision-volume="(v) => (showCollisionVolume = v)"
+          @clear-map="onClearMap"
         />
       </div>
-      <div class="dock-shelf dock-shelf--right">
+      <div
+        v-if="tm.hasMap"
+        class="dock-shelf dock-shelf--right"
+      >
         <div
           class="dock-display dock-display--right"
           :class="{ 'dock-display--collapsed': rightDockDisplayCollapsed }"

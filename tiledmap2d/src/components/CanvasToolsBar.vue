@@ -1,14 +1,24 @@
 <script setup>
 defineProps({
   activeTool: { type: String, required: true },
+  /** 有地图时可清空图层内容 */
+  mapReady: { type: Boolean, default: true },
 })
 
-const emit = defineEmits(['select', 'fit-view', 'actual-size'])
+const emit = defineEmits(['select', 'fit-view', 'actual-size', 'clear-map'])
 
 const tools = [
-  { id: 'select', label: '选择', title: '选择工具' },
-  { id: 'brush', label: '画笔', title: '画笔工具' },
-  { id: 'eraser', label: '橡皮', title: '橡皮工具' },
+  {
+    id: 'select',
+    label: '选择',
+    title: '选择：点选、Ctrl+点多选、拖框选、Shift+拖框追加',
+  },
+  {
+    id: 'fill',
+    label: '填充',
+    title: '填充：有选区时填充选区，无选区时仅填充点击的一格',
+  },
+  { id: 'eraser', label: '橡皮', title: '橡皮：擦除选区或单格' },
 ]
 
 function choose(id) {
@@ -42,19 +52,14 @@ function choose(id) {
           />
         </svg>
         <svg
-          v-else-if="t.id === 'brush'"
+          v-else-if="t.id === 'fill'"
           class="ctb-ico"
           viewBox="0 0 24 24"
           aria-hidden="true"
         >
           <path
-            d="M14.6 4.2l5.2 5.2-9.4 9.4c-.6.6-1.4.9-2.2.9H5v-3.2c0-.8.3-1.6.9-2.2l8.7-10.1z"
             fill="currentColor"
-          />
-          <path
-            d="M4 20h6c0 1.7-1.3 3-3 3H4v-3z"
-            fill="currentColor"
-            opacity="0.75"
+            d="M19 11s-2 2.4-2 4a2 2 0 0 0 4 0c0-1.6-2-4-2-4zm-7 9a4 4 0 0 1-4-4c0-1.9 2-4.5 2-4.5L5.6 6.4 7 5l2.6 2.6c.5-.3 1-.4 1.4-.4 1.5 0 2.7 1.2 2.7 2.7 0 .5-.1 1-.4 1.4L16 14v5h-4zM5 3h6v2H5V3z"
           />
         </svg>
         <svg
@@ -74,6 +79,29 @@ function choose(id) {
           />
         </svg>
         <span class="ctb-lbl">{{ t.label }}</span>
+      </span>
+    </button>
+    <div class="ctb-sep" role="separator" aria-hidden="true" />
+    <button
+      type="button"
+      class="ctb-btn ctb-btn--danger"
+      title="清空地图（确认后清除所有图层上的绘制）"
+      aria-label="清空地图"
+      :disabled="!mapReady"
+      @click="emit('clear-map')"
+    >
+      <span class="ctb-btn-inner">
+        <svg class="ctb-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"
+          />
+        </svg>
+        <span class="ctb-lbl">清空</span>
       </span>
     </button>
     <div class="ctb-sep" role="separator" aria-hidden="true" />
@@ -177,6 +205,18 @@ function choose(id) {
   outline-offset: -1px;
   background: var(--win-list-active);
   border-color: var(--win-accent);
+}
+.ctb-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.ctb-btn--danger:not(:disabled) {
+  color: #a00400;
+}
+.ctb-btn--danger:not(:disabled):hover {
+  color: #850300;
+  border-color: #c0a0a0;
 }
 .ctb-ico {
   width: 18px;

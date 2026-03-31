@@ -6,6 +6,8 @@ import CanvasDisplayPanel from './CanvasDisplayPanel.vue'
 const panning = ref(false)
 
 const props = defineProps({
+  /** 已创建或打开过地图；为 false 时画布区仅显示提示，不响应绘制 */
+  mapReady: { type: Boolean, default: true },
   layers: { type: Array, required: true },
   width: { type: Number, required: true },
   height: { type: Number, required: true },
@@ -14,7 +16,8 @@ const props = defineProps({
   selectedTileId: { type: Number, required: true },
   activeTool: { type: String, required: true },
   activeLayerIndex: { type: Number, required: true },
-  pickedCell: { type: Object, default: null },
+  /** 画布选中的格（多选/框选） */
+  selectedCells: { type: Array, default: () => [] },
   tileTypes: { type: Array, required: true },
   /** 为 true 时绘制棋盘格底色；为 false 时不铺底，空白格透明以透出视口背景（「网格」即指此棋盘格） */
   showGridOverlay: { type: Boolean, default: true },
@@ -25,12 +28,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'paint',
   'cursor',
   'zoom-wheel',
   'tool',
-  'pick-tile',
   'set-zoom',
+  'clear-map',
+  'selection-change',
+  'selection-add',
+  'selection-toggle',
+  'apply-tiles',
   'update:showGridOverlay',
   'update:showOriginMarker',
   'update:showCollisionVolume',
@@ -42,9 +48,14 @@ const wrapRef = ref(null)
 /** 画布在视口内的平移（px），与缩放无关；不依赖 scroll，可任意方向无限平移 */
 const panX = ref(0)
 const panY = ref(0)
-let painting = false
 let lastPanX = 0
 let lastPanY = 0
+/** 选择工具：框选/点选手势 */
+let selectGesture = null
+/** 框选预览终点（pointermove 更新） */
+const boxSelectPreview = ref(null)
+/** 选择拖动过程中最后一次落在地图上的格（指针抬起在网格外时用） */
+let selectLastCell = null
 /** 中键仅用于平移（button===1）；选择工具下也不再支持中键点选 */
 let middlePanState = 'idle'
 let toolBeforeSpace = null
@@ -233,24 +244,40 @@ function draw() {
     }
   }
 
-  const p = props.pickedCell
-  if (p && props.activeTool === 'select') {
-    const gx = p.gx
-    const gy = p.gy
-    if (
-      gx >= 0 &&
-      gy >= 0 &&
-      gx < props.width &&
-      gy < props.height
-    ) {
+  const showSel =
+    props.activeTool === 'select' ||
+    props.activeTool === 'fill' ||
+    props.activeTool === 'eraser'
+  if (showSel && props.selectedCells?.length) {
+    ctx.strokeStyle = '#0067c0'
+    ctx.lineWidth = 2
+    for (const p of props.selectedCells) {
+      const gx = p.gx
+      const gy = p.gy
+      if (gx < 0 || gy < 0 || gx >= props.width || gy >= props.height) continue
       const x = xs[gx]
       const y = ys[gy]
       const w = xs[gx + 1] - xs[gx]
       const h = ys[gy + 1] - ys[gy]
-      ctx.strokeStyle = '#0067c0'
-      ctx.lineWidth = 2
       ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3)
     }
+  }
+
+  const bx = boxSelectPreview.value
+  if (bx && props.activeTool === 'select') {
+    const gx0 = Math.min(bx.gx0, bx.gx1)
+    const gx1 = Math.max(bx.gx0, bx.gx1)
+    const gy0 = Math.min(bx.gy0, bx.gy1)
+    const gy1 = Math.max(bx.gy0, bx.gy1)
+    const x = xs[gx0]
+    const y = ys[gy0]
+    const rw = xs[gx1 + 1] - xs[gx0]
+    const rh = ys[gy1 + 1] - ys[gy0]
+    ctx.strokeStyle = '#0067c0'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 3])
+    ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, rw - 1), Math.max(0, rh - 1))
+    ctx.setLineDash([])
   }
 }
 
@@ -279,12 +306,27 @@ function tileIdAtActiveLayer(cell) {
   return L.tiles?.[cell.gy]?.[cell.gx] ?? 0
 }
 
+function cellsInInclusiveRect(gx0, gy0, gx1, gy1, w, h) {
+  const xa = Math.min(gx0, gx1)
+  const xb = Math.max(gx0, gx1)
+  const ya = Math.min(gy0, gy1)
+  const yb = Math.max(gy0, gy1)
+  const out = []
+  for (let gy = ya; gy <= yb; gy++) {
+    for (let gx = xa; gx <= xb; gx++) {
+      if (gx >= 0 && gx < w && gy >= 0 && gy < h) out.push({ gx, gy })
+    }
+  }
+  return out
+}
+
 function applyMiddlePanDelta(dx, dy) {
   panX.value += dx
   panY.value += dy
 }
 
 function onPointerDown(e) {
+  if (!props.mapReady) return
   wrapRef.value?.focus()
   if (e.button === 1) {
     e.preventDefault()
@@ -299,32 +341,41 @@ function onPointerDown(e) {
   innerRef.value?.setPointerCapture(e.pointerId)
   const cell = eventToCell(e)
   emit('cursor', cell)
-  if (props.activeTool === 'select') {
-    if (e.button === 0 && cell) {
-      const tileId = tileIdAtActiveLayer(cell)
-      emit('pick-tile', {
-        gx: cell.gx,
-        gy: cell.gy,
-        tileId,
-      })
+
+  if (props.activeTool === 'select' && e.button === 0) {
+    selectLastCell = cell
+    selectGesture = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startCell: cell,
+      ctrlKey: e.ctrlKey || e.metaKey,
+      shiftKey: e.shiftKey,
+      pointerId: e.pointerId,
+      dragged: false,
     }
+    boxSelectPreview.value = null
     return
   }
-  if (e.button === 0) {
-    painting = true
-    if (!cell) return
-    if (props.activeTool === 'eraser') {
-      emit('paint', cell.gx, cell.gy, 0)
-      return
-    }
-    emit('paint', cell.gx, cell.gy, props.selectedTileId)
-  } else if (e.button === 2) {
-    painting = true
-    if (cell) emit('paint', cell.gx, cell.gy, 0)
+
+  if (
+    (props.activeTool === 'fill' || props.activeTool === 'eraser') &&
+    (e.button === 0 || e.button === 2)
+  ) {
+    const cells =
+      props.selectedCells.length > 0
+        ? props.selectedCells
+        : cell
+          ? [{ gx: cell.gx, gy: cell.gy }]
+          : []
+    if (cells.length === 0) return
+    const tileId =
+      props.activeTool === 'eraser' || e.button === 2 ? 0 : props.selectedTileId
+    emit('apply-tiles', { cells, tileId })
   }
 }
 
 function onPointerMove(e) {
+  if (!props.mapReady) return
   if (middlePanState === 'active' && (e.buttons & MIDDLE_BUTTONS_MASK)) {
     e.preventDefault()
     const dx = e.clientX - lastPanX
@@ -336,12 +387,71 @@ function onPointerMove(e) {
   }
   const cell = eventToCell(e)
   emit('cursor', cell)
-  if (props.activeTool === 'select') return
-  if (!painting) return
-  if (cell) {
-    let id = e.buttons === 2 ? 0 : props.selectedTileId
-    if (props.activeTool === 'eraser') id = 0
-    emit('paint', cell.gx, cell.gy, id)
+
+  if (props.activeTool === 'select' && selectGesture && e.buttons === 1) {
+    if (cell) selectLastCell = cell
+    const dx = e.clientX - selectGesture.startX
+    const dy = e.clientY - selectGesture.startY
+    if (dx * dx + dy * dy > 25) selectGesture.dragged = true
+    const end = cell ?? selectLastCell
+    if (selectGesture.dragged && selectGesture.startCell && end) {
+      boxSelectPreview.value = {
+        gx0: selectGesture.startCell.gx,
+        gy0: selectGesture.startCell.gy,
+        gx1: end.gx,
+        gy1: end.gy,
+      }
+      draw()
+    }
+  }
+}
+
+function finishSelectGesture(e) {
+  const g = selectGesture
+  selectGesture = null
+  boxSelectPreview.value = null
+  if (!g) return
+  const endCell = eventToCell(e) ?? selectLastCell
+  selectLastCell = null
+  const dx = e.clientX - g.startX
+  const dy = e.clientY - g.startY
+  const dist2 = dx * dx + dy * dy
+  const w = props.width
+  const h = props.height
+
+  if (g.dragged && g.startCell && endCell) {
+    const cells = cellsInInclusiveRect(
+      g.startCell.gx,
+      g.startCell.gy,
+      endCell.gx,
+      endCell.gy,
+      w,
+      h,
+    )
+    const paletteTileId = tileIdAtActiveLayer(g.startCell)
+    if (g.shiftKey) {
+      emit('selection-add', { cells, paletteTileId })
+    } else {
+      emit('selection-change', { cells, paletteTileId })
+    }
+    draw()
+    return
+  }
+
+  if (dist2 <= 25 && g.startCell) {
+    const paletteTileId = tileIdAtActiveLayer(g.startCell)
+    if (g.ctrlKey) {
+      emit('selection-toggle', {
+        cell: g.startCell,
+        paletteTileId,
+      })
+    } else {
+      emit('selection-change', {
+        cells: [{ gx: g.startCell.gx, gy: g.startCell.gy }],
+        paletteTileId,
+      })
+    }
+    draw()
   }
 }
 
@@ -359,7 +469,9 @@ function onPointerUp(e) {
     }
     return
   }
-  painting = false
+  if (props.activeTool === 'select' && e.button === 0) {
+    finishSelectGesture(e)
+  }
   try {
     if (e?.pointerId != null) {
       innerRef.value?.releasePointerCapture(e.pointerId)
@@ -378,7 +490,8 @@ function onPointerLeave(e) {
 function onPointerCancel(e) {
   middlePanState = 'idle'
   panning.value = false
-  painting = false
+  selectGesture = null
+  boxSelectPreview.value = null
   try {
     if (e?.pointerId != null) {
       innerRef.value?.releasePointerCapture(e.pointerId)
@@ -389,6 +502,7 @@ function onPointerCancel(e) {
 }
 
 function onWheel(e) {
+  if (!props.mapReady) return
   e.preventDefault()
   const canvas = canvasRef.value
   const wrap = wrapRef.value
@@ -421,11 +535,12 @@ function onWindowSpaceUp(e) {
   e.preventDefault()
   window.removeEventListener('keyup', onWindowSpaceUp, true)
   spaceHoldListener = false
-  emit('tool', toolBeforeSpace ?? 'brush')
+  emit('tool', toolBeforeSpace ?? 'fill')
   toolBeforeSpace = null
 }
 
 function fitView() {
+  if (!props.mapReady) return
   const wrap = wrapRef.value
   if (!wrap) return
   const m = VIEW_SCROLL_MARGIN_MIN
@@ -448,6 +563,7 @@ function fitView() {
 
 /** 1:1：zoom=1，且以视口中心为锚缩放（中心点下地图格位置不变） */
 function actualSizeView() {
+  if (!props.mapReady) return
   const wrap = wrapRef.value
   if (!wrap) return
   const vw = wrap.clientWidth
@@ -487,9 +603,11 @@ function scheduleCenter() {
 }
 
 function cursorForTool() {
+  if (!props.mapReady) return 'default'
   if (panning.value) return 'grabbing'
   if (props.activeTool === 'select') return 'default'
   if (props.activeTool === 'eraser') return 'cell'
+  if (props.activeTool === 'fill') return 'crosshair'
   return 'crosshair'
 }
 
@@ -500,6 +618,7 @@ function panViewportBy(dx, dy) {
 }
 
 function onWrapKeyDown(e) {
+  if (!props.mapReady) return
   const wrap = wrapRef.value
   if (!wrap || document.activeElement !== wrap) return
 
@@ -528,13 +647,15 @@ function onWrapKeyDown(e) {
 
 watch(
   () => [
+    props.mapReady,
     props.layers,
     props.tileTypes,
     props.width,
     props.height,
     props.tileSize,
     props.zoom,
-    props.pickedCell,
+    props.selectedCells,
+    boxSelectPreview,
     props.activeTool,
     props.activeLayerIndex,
     props.showGridOverlay,
@@ -590,7 +711,7 @@ onUnmounted(() => {
       <div
         ref="innerRef"
         class="viewport-inner"
-        :class="{ 'is-panning': panning }"
+        :class="{ 'is-panning': panning, 'is-no-map': !mapReady }"
         :style="{ cursor: cursorForTool() }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
@@ -608,6 +729,16 @@ onUnmounted(() => {
         >
           <canvas ref="canvasRef" class="tile-canvas" tabindex="-1" />
         </div>
+        <div
+          v-if="!mapReady"
+          class="viewport-no-map"
+          aria-live="polite"
+        >
+          <p class="viewport-no-map-title">当前没有地图</p>
+          <p class="viewport-no-map-hint">
+            创建或打开地图后，将显示地图层与块库（块表由地图文件定义）。
+          </p>
+        </div>
       </div>
     </div>
     <!-- 覆盖层不参与滚动：工具栏与「显示」共用一个父节点，左右分列 -->
@@ -616,7 +747,9 @@ onUnmounted(() => {
         <div class="viewport-chrome-left">
           <CanvasToolsBar
             :active-tool="activeTool"
+            :map-ready="mapReady"
             @select="(t) => emit('tool', t)"
+            @clear-map="emit('clear-map')"
             @fit-view="fitView"
             @actual-size="actualSizeView"
           />
@@ -681,6 +814,33 @@ onUnmounted(() => {
 }
 .viewport-inner.is-panning {
   cursor: grabbing !important;
+}
+.viewport-no-map {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  background: rgba(240, 240, 240, 0.92);
+  color: var(--win-text-secondary);
+  font-size: 13px;
+  pointer-events: none;
+}
+.viewport-no-map-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--win-text);
+  font-size: 14px;
+}
+.viewport-no-map-hint {
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.45;
 }
 .viewport-scroll:focus-visible {
   outline: 2px solid var(--win-accent);

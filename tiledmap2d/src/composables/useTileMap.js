@@ -71,6 +71,58 @@ export const DEFAULT_TILE_TYPES = [
   },
 ]
 
+/** 无地图时仅保留「空」类型，表示尚未载入任何块库 */
+function cloneEmptyOnlyPalette() {
+  return cloneTileTypes([DEFAULT_TILE_TYPES[0]])
+}
+
+/**
+ * 与地图属性中的 tileSize 对齐的纹理像素边长（与 addTileTypeFromImage 一致）
+ */
+function clampMapTileTexSize(ts) {
+  return Math.max(
+    8,
+    Math.min(128, Math.floor(Number(ts)) || DEFAULT_TILE_SIZE)
+  )
+}
+
+/**
+ * 新建地图时的默认块表：草地/水等纯色块的 texture 宽高与当前地图瓦片边长一致（与后续导入块相同规则）
+ */
+function cloneDefaultPaletteForMapTileSize(ts) {
+  const tex = clampMapTileTexSize(ts)
+  const rows = cloneTileTypes()
+  return rows.map((t) => ({
+    ...t,
+    textureWidth:
+      t.textureWidth != null && Number.isFinite(Number(t.textureWidth))
+        ? Math.max(8, Math.min(128, Math.floor(Number(t.textureWidth))))
+        : tex,
+    textureHeight:
+      t.textureHeight != null && Number.isFinite(Number(t.textureHeight))
+        ? Math.max(8, Math.min(128, Math.floor(Number(t.textureHeight))))
+        : tex,
+  }))
+}
+
+/**
+ * 地图 tileSize 变更时：无贴图且纹理边长仍等于旧 tileSize 的块（含默认纯色块）与新 tileSize 对齐
+ */
+function syncPlainTileTextureDimsToMapTileSize(oldTs, newTs) {
+  const ot = clampMapTileTexSize(oldTs)
+  const nt = clampMapTileTexSize(newTs)
+  if (ot === nt) return
+  tileTypes.value = tileTypes.value.map((t) => {
+    if (t.imageDataUrl) return t
+    const tw = t.textureWidth
+    const th = t.textureHeight
+    const followedMap =
+      (tw == null && th == null) || (tw === ot && th === ot)
+    if (!followedMap) return t
+    return { ...t, textureWidth: nt, textureHeight: nt }
+  })
+}
+
 function cloneTileTypes(source = DEFAULT_TILE_TYPES) {
   return source.map((t) => ({
     id: t.id,
@@ -152,18 +204,32 @@ function normalizeLayerKind(k) {
   return 'tile'
 }
 
+function normalizeSelectionCells(cells, w, h) {
+  const m = new Map()
+  for (const c of cells) {
+    const gx = Math.floor(Number(c.gx))
+    const gy = Math.floor(Number(c.gy))
+    if (!Number.isFinite(gx) || !Number.isFinite(gy)) continue
+    if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue
+    m.set(`${gx},${gy}`, { gx, gy })
+  }
+  return [...m.values()]
+}
+
 export function useTileMap() {
-  const tileTypes = ref(cloneTileTypes())
+  const tileTypes = ref(cloneEmptyOnlyPalette())
 
   const width = ref(DEFAULT_W)
   const height = ref(DEFAULT_H)
   const tileSize = ref(DEFAULT_TILE_SIZE)
-  const layers = shallowRef([createLayer('地面', DEFAULT_W, DEFAULT_H, 'tile')])
+  /** 尚未「新建/打开」过地图时为 false，图层列表为空 */
+  const hasMap = ref(false)
+  const layers = shallowRef([])
   const activeLayerIndex = ref(0)
-  const selectedTileId = ref(1)
-  const activeTool = ref('brush')
-  /** 选择工具下当前选中的格（用于画布高亮），非选择工具时为 null */
-  const pickedCell = ref(null)
+  const selectedTileId = ref(0)
+  const activeTool = ref('fill')
+  /** 画布上选中的格（多选/框选）；用于高亮与填充/擦除范围 */
+  const selectedCells = ref([])
   const zoom = ref(1)
   const lastError = ref('')
   const cursorCell = ref(null)
@@ -198,17 +264,61 @@ export function useTileMap() {
 
   function setActiveTool(tool) {
     const t = String(tool ?? '')
-    if (t !== 'select' && t !== 'brush' && t !== 'eraser') return
-    if (t === 'brush' || t === 'eraser') pickedCell.value = null
+    if (t !== 'select' && t !== 'fill' && t !== 'eraser') return
+    if (t === 'eraser') selectedCells.value = []
     activeTool.value = t
   }
 
-  function setPickedCell(gx, gy) {
-    pickedCell.value = { gx, gy }
+  function setSelection(cells) {
+    selectedCells.value = normalizeSelectionCells(
+      cells,
+      width.value,
+      height.value,
+    )
   }
 
-  function clearPickedCell() {
-    pickedCell.value = null
+  function toggleCellInSelection(gx, gy) {
+    const w = width.value
+    const h = height.value
+    if (gx < 0 || gy < 0 || gx >= w || gy >= h) return
+    const cur = selectedCells.value
+    const idx = cur.findIndex((c) => c.gx === gx && c.gy === gy)
+    if (idx >= 0) {
+      selectedCells.value = cur.filter((_, i) => i !== idx)
+    } else {
+      selectedCells.value = [...cur, { gx, gy }]
+    }
+  }
+
+  function addCellsToSelection(cells) {
+    const norm = normalizeSelectionCells(cells, width.value, height.value)
+    const m = new Map(selectedCells.value.map((c) => [`${c.gx},${c.gy}`, c]))
+    for (const c of norm) m.set(`${c.gx},${c.gy}`, c)
+    selectedCells.value = [...m.values()]
+  }
+
+  function clearSelection() {
+    selectedCells.value = []
+  }
+
+  /** 一次写入多格（填充/擦除选区） */
+  function fillCells(cells, tileId) {
+    if (!activeLayerIsTile()) return
+    if (!isValidTileId(tileId)) return
+    const idx = activeLayerIndex.value
+    const L = layers.value[idx]
+    if (!L) return
+    const w = width.value
+    const h = height.value
+    const list = normalizeSelectionCells(cells, w, h)
+    if (list.length === 0) return
+    const nextTiles = L.tiles.map((row) => row.slice())
+    for (const c of list) {
+      nextTiles[c.gy][c.gx] = tileId
+    }
+    const nextLayers = layers.value.slice()
+    nextLayers[idx] = { ...L, tiles: nextTiles }
+    layers.value = nextLayers
   }
 
   function replaceLayers(nextLayers, activeIx = 0) {
@@ -235,7 +345,10 @@ export function useTileMap() {
     height.value = ch
     tileSize.value = cts
     replaceLayers([createLayer('地面', cw, ch, 'tile')], 0)
-    pickedCell.value = null
+    hasMap.value = true
+    tileTypes.value = cloneDefaultPaletteForMapTileSize(cts)
+    selectedTileId.value = 1
+    clearSelection()
     clearError()
   }
 
@@ -243,20 +356,23 @@ export function useTileMap() {
    * 修改地图宽高与 tileSize，保留各层数据并按新尺寸裁剪/扩展
    */
   function applyMapSettings(w, h, ts) {
+    if (!hasMap.value || layers.value.length === 0) return
     const cw = Math.max(1, Math.min(256, Math.floor(Number(w)) || DEFAULT_W))
     const ch = Math.max(1, Math.min(256, Math.floor(Number(h)) || DEFAULT_H))
     const cts = Math.max(8, Math.min(128, Math.floor(Number(ts)) || DEFAULT_TILE_SIZE))
     const oldW = width.value
     const oldH = height.value
+    const oldTileSize = tileSize.value
     width.value = cw
     height.value = ch
     tileSize.value = cts
+    syncPlainTileTextureDimsToMapTileSize(oldTileSize, cts)
     const nextLayers = layers.value.map((L) => ({
       ...L,
       tiles: resizeTilesGrid(L.tiles, oldW, oldH, cw, ch),
     }))
     layers.value = nextLayers
-    pickedCell.value = null
+    clearSelection()
     clearError()
   }
 
@@ -266,6 +382,7 @@ export function useTileMap() {
   }
 
   function clearMap() {
+    if (!hasMap.value) return
     const w = width.value
     const h = height.value
     replaceLayers(
@@ -275,7 +392,7 @@ export function useTileMap() {
       })),
       activeLayerIndex.value
     )
-    pickedCell.value = null
+    clearSelection()
     clearError()
   }
 
@@ -316,6 +433,7 @@ export function useTileMap() {
    * @param {{ kind?: 'tile'|'image'|'area', insert: 'above'|'below'|'top'|'bottom' }} options
    */
   function insertLayer(options) {
+    if (!hasMap.value) return
     const kind = normalizeLayerKind(options?.kind)
     const insert = String(options?.insert ?? 'above')
     const w = width.value
@@ -368,8 +486,9 @@ export function useTileMap() {
   }
 
   function setActiveLayer(index) {
+    if (layers.value.length === 0) return
     const i = Math.max(0, Math.min(index, layers.value.length - 1))
-    if (i !== activeLayerIndex.value) pickedCell.value = null
+    if (i !== activeLayerIndex.value) clearSelection()
     activeLayerIndex.value = i
   }
 
@@ -393,6 +512,7 @@ export function useTileMap() {
   }
 
   function exportMap() {
+    if (!hasMap.value) return null
     const body = {
       version: MAP_VERSION,
       tileSize: tileSize.value,
@@ -554,7 +674,8 @@ export function useTileMap() {
       height.value = th
       tileSize.value = ts
       replaceLayers(r, ai)
-      pickedCell.value = null
+      hasMap.value = true
+      clearSelection()
       clearError()
       return null
     }
@@ -577,7 +698,8 @@ export function useTileMap() {
         ],
         0
       )
-      pickedCell.value = null
+      hasMap.value = true
+      clearSelection()
       clearError()
       return null
     }
@@ -616,6 +738,7 @@ export function useTileMap() {
    * 每项：`{ name, color, imageDataUrl? }`，首项为「空」。
    */
   function importTileTypesJson(text) {
+    if (!hasMap.value) return '请先创建或打开地图'
     let data
     try {
       data = JSON.parse(text)
@@ -634,6 +757,7 @@ export function useTileMap() {
 
   /** 从图片 data URL 追加一种块类型 */
   async function addTileTypeFromImage(name, dataUrl) {
+    if (!hasMap.value) return '请先创建或打开地图'
     if (tileTypes.value.length >= 256) return '块类型过多（≤256）'
     const baseName = String(name ?? '').trim() || `块 ${tileTypes.value.length}`
     let color
@@ -643,6 +767,10 @@ export function useTileMap() {
       return '图片解析失败'
     }
     const id = tileTypes.value.length
+    const defTex = Math.max(
+      8,
+      Math.min(128, Math.floor(tileSize.value) || DEFAULT_TILE_SIZE)
+    )
     tileTypes.value = [
       ...tileTypes.value,
       {
@@ -652,8 +780,8 @@ export function useTileMap() {
         imageDataUrl: dataUrl,
         collisionType: 'none',
         transparentColor: null,
-        textureWidth: null,
-        textureHeight: null,
+        textureWidth: defTex,
+        textureHeight: defTex,
         colorDepthMode: 'rgba8',
       },
     ]
@@ -814,6 +942,7 @@ export function useTileMap() {
   })
 
   return {
+    hasMap,
     tileTypes,
     importTileTypesJson,
     addTileTypeFromImage,
@@ -827,9 +956,12 @@ export function useTileMap() {
     tiles,
     selectedTileId,
     setSelectedTileId,
-    pickedCell,
-    setPickedCell,
-    clearPickedCell,
+    selectedCells,
+    setSelection,
+    toggleCellInSelection,
+    addCellsToSelection,
+    clearSelection,
+    fillCells,
     activeTool,
     setActiveTool,
     zoom,

@@ -191,6 +191,13 @@ function onPointerUp(e) {
 }
 
 function onClear() {
+  if (
+    !window.confirm(
+      '用底色填满将覆盖当前画布上的全部像素，是否继续？',
+    )
+  ) {
+    return
+  }
   const canvas = canvasRef.value
   if (!canvas) return
   const ctx = canvas.getContext('2d')
@@ -244,6 +251,13 @@ function onImportFile(e) {
   const f = input.files?.[0]
   input.value = ''
   if (!f || !/^image\//.test(f.type)) return
+  if (
+    !window.confirm(
+      '导入图片将替换当前画布上的全部像素，是否继续？',
+    )
+  ) {
+    return
+  }
   const reader = new FileReader()
   reader.onload = () => {
     const dataUrl = String(reader.result ?? '')

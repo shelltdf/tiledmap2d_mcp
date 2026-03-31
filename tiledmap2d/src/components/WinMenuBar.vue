@@ -2,8 +2,10 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
 const emit = defineEmits([
-  'export-json',
-  'import-json',
+  'new-map',
+  'open-json',
+  'save',
+  'save-as',
   'export-tmx',
   'import-tmx',
   'clear',
@@ -55,17 +57,54 @@ onUnmounted(() => {
         文件(<span class="mn">F</span>)
       </button>
       <div v-show="openId === 'file'" class="menu-dd" role="menu">
-        <button type="button" class="menu-item" role="menuitem" @click="run('export-json')">
-          导出 JSON…
+        <button
+          type="button"
+          class="menu-item"
+          role="menuitem"
+          @click="run('new-map')"
+        >
+          新建…
         </button>
-        <button type="button" class="menu-item" role="menuitem" @click="run('import-json')">
-          导入 JSON…
+        <button
+          type="button"
+          class="menu-item"
+          role="menuitem"
+          @click="run('open-json')"
+        >
+          打开…
         </button>
         <div class="menu-sep" />
-        <button type="button" class="menu-item" role="menuitem" @click="run('export-tmx')">
+        <button
+          type="button"
+          class="menu-item"
+          role="menuitem"
+          @click="run('save')"
+        >
+          保存
+        </button>
+        <button
+          type="button"
+          class="menu-item"
+          role="menuitem"
+          @click="run('save-as')"
+        >
+          另存为…
+        </button>
+        <div class="menu-sep" />
+        <button
+          type="button"
+          class="menu-item"
+          role="menuitem"
+          @click="run('export-tmx')"
+        >
           导出 TMX…
         </button>
-        <button type="button" class="menu-item" role="menuitem" @click="run('import-tmx')">
+        <button
+          type="button"
+          class="menu-item"
+          role="menuitem"
+          @click="run('import-tmx')"
+        >
           导入 TMX…
         </button>
       </div>

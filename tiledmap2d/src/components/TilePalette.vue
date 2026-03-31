@@ -49,7 +49,11 @@ function onImportImage(e) {
       <button type="button" class="pal-btn" @click="emit('edit-type')">
         编辑
       </button>
-      <button type="button" class="pal-btn" @click="emit('delete-type')">
+      <button
+        type="button"
+        class="pal-btn pal-btn--danger"
+        @click="emit('delete-type')"
+      >
         删除
       </button>
     </div>
@@ -139,6 +143,12 @@ function onImportImage(e) {
 }
 .pal-btn:hover {
   background: var(--win-hover);
+}
+.pal-btn--danger {
+  color: #c50500;
+}
+.pal-btn--danger:hover {
+  color: #a00400;
 }
 label.pal-btn {
   display: inline-flex;

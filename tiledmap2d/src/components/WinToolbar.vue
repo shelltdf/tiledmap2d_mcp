@@ -1,10 +1,12 @@
 <script setup>
+defineProps({
+  /** 已创建或打开过地图，可编辑画布与导出 */
+  mapReady: { type: Boolean, default: true },
+})
+
 const emit = defineEmits([
   'open-new-map',
   'open-map-settings',
-  'clear',
-  'export',
-  'import',
   'export-tmx',
   'import-tmx',
 ])
@@ -48,6 +50,7 @@ const emit = defineEmits([
         class="win-btn tb-icon-btn"
         title="地图设置…"
         aria-label="地图设置"
+        :disabled="!mapReady"
         @click="emit('open-map-settings')"
       >
         <svg class="tb-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -65,73 +68,10 @@ const emit = defineEmits([
     <div class="tb-group">
       <button
         type="button"
-        class="win-btn tb-icon-btn"
-        title="清空地图"
-        aria-label="清空地图"
-        @click="emit('clear')"
-      >
-        <svg class="tb-ico" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"
-          />
-        </svg>
-      </button>
-      <button
-        type="button"
-        class="win-btn primary tb-icon-btn"
-        title="导出 JSON"
-        aria-label="导出 JSON"
-        @click="emit('export')"
-      >
-        <svg class="tb-ico" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
-          />
-        </svg>
-      </button>
-      <label
-        class="win-btn file-label tb-icon-btn"
-        title="导入 JSON"
-        aria-label="导入 JSON"
-      >
-        <svg class="tb-ico" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
-          />
-        </svg>
-        <input
-          type="file"
-          accept="application/json,.json"
-          class="file-input"
-          @change="
-            (e) => {
-              const f = e.target.files?.[0]
-              if (f) emit('import', f)
-              e.target.value = ''
-            }
-          "
-        />
-      </label>
-      <button
-        type="button"
         class="win-btn primary tb-icon-btn"
         title="导出 TMX"
         aria-label="导出 TMX"
+        :disabled="!mapReady"
         @click="emit('export-tmx')"
       >
         <svg class="tb-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -141,7 +81,7 @@ const emit = defineEmits([
             stroke-width="1.75"
             stroke-linecap="round"
             stroke-linejoin="round"
-            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
+            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
           />
         </svg>
       </button>
@@ -157,7 +97,7 @@ const emit = defineEmits([
             stroke-width="1.75"
             stroke-linecap="round"
             stroke-linejoin="round"
-            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
+            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
           />
         </svg>
         <input
