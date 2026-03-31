@@ -39,7 +39,7 @@ const rightDockEdgeActive = computed(
 
 const statusMessage = computed(() => {
   if (tm.lastError) return tm.lastError
-  return '就绪 — 左键绘制，右键擦除；中键拖动画布平移；选择工具下中键点按拾取格中块、拖动仍平移；块库中键选块；滚轮缩放以指针为中心；画布聚焦时按住空格临时选择、松开恢复；方向键平移视口；支持 JSON / TMX（Tiled）'
+  return '就绪 — 左键绘制，右键擦除；中键拖动画布平移；选择工具下左键拾取格中块；块库左键选块；滚轮缩放以指针为中心；画布聚焦时按住空格临时选择、松开恢复；方向键平移视口；支持 JSON / TMX（Tiled）'
 })
 
 const cursorText = computed(() => {

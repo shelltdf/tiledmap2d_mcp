@@ -12,13 +12,6 @@ const emit = defineEmits([
   'collapse',
 ])
 
-/** 中键：不触发左键 click，在此单独选中并避免浏览器默认行为 */
-function onMiddlePointerDown(e, id) {
-  if (e.button !== 1) return
-  e.preventDefault()
-  emit('select', Number(id))
-}
-
 function onImportFile(e) {
   const input = e.target
   const f = input.files?.[0]
@@ -71,8 +64,7 @@ function onImportFile(e) {
         type="button"
         class="swatch"
         :class="{ active: selectedId === t.id }"
-        :title="t.name + ' · 中键快速选择'"
-        @pointerdown="onMiddlePointerDown($event, t.id)"
+        :title="t.name"
         @click="emit('select', Number(t.id))"
       >
         <span

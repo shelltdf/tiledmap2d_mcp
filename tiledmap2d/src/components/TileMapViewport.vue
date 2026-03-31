@@ -42,18 +42,12 @@ const panY = ref(0)
 let painting = false
 let lastPanX = 0
 let lastPanY = 0
-/**
- * 中键平移状态机（仅 button===1）
- * - idle：未按中键
- * - pending：选择工具下已按下，尚未判定是「点选格」还是「拖动画布」
- * - active：正在用中键拖动平移视图（transform）
- */
+/** 中键仅用于平移（button===1）；选择工具下也不再支持中键点选 */
 let middlePanState = 'idle'
 let toolBeforeSpace = null
 let spaceHoldListener = false
 let wrapResizeObserver = null
 
-const MIDDLE_PAN_THRESHOLD_PX = 8
 const MIDDLE_BUTTONS_MASK = 4
 
 const KEY_SCROLL_STEP = 48
@@ -212,13 +206,8 @@ function onPointerDown(e) {
     lastPanX = e.clientX
     lastPanY = e.clientY
     innerRef.value?.setPointerCapture(e.pointerId)
-    if (props.activeTool === 'select') {
-      middlePanState = 'pending'
-      panning.value = false
-    } else {
-      middlePanState = 'active'
-      panning.value = true
-    }
+    middlePanState = 'active'
+    panning.value = true
     return
   }
   e.preventDefault()
@@ -251,25 +240,14 @@ function onPointerDown(e) {
 }
 
 function onPointerMove(e) {
-  if (middlePanState !== 'idle' && (e.buttons & MIDDLE_BUTTONS_MASK)) {
+  if (middlePanState === 'active' && (e.buttons & MIDDLE_BUTTONS_MASK)) {
     e.preventDefault()
     const dx = e.clientX - lastPanX
     const dy = e.clientY - lastPanY
-    if (middlePanState === 'pending') {
-      if (Math.hypot(dx, dy) <= MIDDLE_PAN_THRESHOLD_PX) return
-      middlePanState = 'active'
-      panning.value = true
-      applyMiddlePanDelta(dx, dy)
-      lastPanX = e.clientX
-      lastPanY = e.clientY
-      return
-    }
-    if (middlePanState === 'active') {
-      applyMiddlePanDelta(dx, dy)
-      lastPanX = e.clientX
-      lastPanY = e.clientY
-      return
-    }
+    applyMiddlePanDelta(dx, dy)
+    lastPanX = e.clientX
+    lastPanY = e.clientY
+    return
   }
   const cell = eventToCell(e)
   emit('cursor', cell)
@@ -285,16 +263,6 @@ function onPointerMove(e) {
 function onPointerUp(e) {
   if (e.button === 1) {
     e.preventDefault()
-    if (middlePanState === 'pending' && props.activeTool === 'select') {
-      const cell = eventToCell(e)
-      if (cell) {
-        emit('pick-tile', {
-          gx: cell.gx,
-          gy: cell.gy,
-          tileId: tileIdAtActiveLayer(cell),
-        })
-      }
-    }
     middlePanState = 'idle'
     panning.value = false
     try {
@@ -318,7 +286,7 @@ function onPointerUp(e) {
 
 /** 中键平移时指针可能移出画布矩形，不要用 leave 结束拖拽（否则像无法自由平移） */
 function onPointerLeave(e) {
-  if (middlePanState === 'active' || middlePanState === 'pending') return
+  if (middlePanState === 'active') return
   onPointerUp(e)
 }
 

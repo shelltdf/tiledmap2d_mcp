@@ -6,9 +6,9 @@ defineProps({
 const emit = defineEmits(['select', 'fit-view', 'actual-size'])
 
 const tools = [
-  { id: 'select', label: '选择', title: '选择工具' },
-  { id: 'brush', label: '画笔', title: '画笔工具' },
-  { id: 'eraser', label: '橡皮', title: '橡皮工具' },
+  { id: 'select', title: '选择工具' },
+  { id: 'brush', title: '画笔工具' },
+  { id: 'eraser', title: '橡皮工具' },
 ]
 
 function choose(id) {
@@ -18,7 +18,6 @@ function choose(id) {
 
 <template>
   <div class="ctb win-panel" role="toolbar" aria-label="画布工具栏">
-    <div class="ctb-title">工具栏</div>
     <button
       v-for="t in tools"
       :key="t.id"
@@ -29,7 +28,6 @@ function choose(id) {
       :aria-label="t.title"
       @click="choose(t.id)"
     >
-      <span class="ctb-btn-inner">
       <svg
         v-if="t.id === 'select'"
         class="ctb-ico"
@@ -73,10 +71,8 @@ function choose(id) {
           opacity="0.65"
         />
       </svg>
-      <span class="ctb-lbl">{{ t.label }}</span>
-      </span>
     </button>
-    <div class="ctb-sep" role="separator" />
+    <div class="ctb-sep" role="separator" aria-hidden="true" />
     <button
       type="button"
       class="ctb-btn"
@@ -84,15 +80,12 @@ function choose(id) {
       aria-label="适应窗口"
       @click="emit('fit-view')"
     >
-      <span class="ctb-btn-inner">
-        <svg class="ctb-ico" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M4 8V4h4M16 4h4v4M4 16v4h4M16 20h4v-4M8 8h8v8H8V8z"
-          />
-        </svg>
-        <span class="ctb-lbl">适应</span>
-      </span>
+      <svg class="ctb-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M4 8V4h4M16 4h4v4M4 16v4h4M16 20h4v-4M8 8h8v8H8V8z"
+        />
+      </svg>
     </button>
     <button
       type="button"
@@ -101,15 +94,12 @@ function choose(id) {
       aria-label="1:1 实际大小，视口中心缩放"
       @click="emit('actual-size')"
     >
-      <span class="ctb-btn-inner">
-        <svg class="ctb-ico" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M7 7h10v10H7V7zm2 2v6h6V9H9z"
-          />
-        </svg>
-        <span class="ctb-lbl">1:1</span>
-      </span>
+      <svg class="ctb-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M7 7h10v10H7V7zm2 2v6h6V9H9z"
+        />
+      </svg>
     </button>
   </div>
 </template>
@@ -117,42 +107,23 @@ function choose(id) {
 <style scoped>
 .ctb {
   width: auto;
-  min-width: 72px;
+  min-width: 0;
   padding: 6px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
   user-select: none;
 }
-.ctb-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--win-text-secondary);
-  width: 100%;
-  text-align: left;
-  padding: 0 4px 2px;
-}
-.ctb-btn-inner {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  width: 100%;
-}
-.ctb-lbl {
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-}
 .ctb-btn {
-  width: 100%;
-  min-height: 28px;
-  height: auto;
-  padding: 4px 8px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   border: 1px solid var(--win-btn-border);
   border-radius: var(--win-radius-btn);
   background: linear-gradient(
@@ -179,8 +150,9 @@ function choose(id) {
   border-color: var(--win-accent);
 }
 .ctb-ico {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 .ctb-sep {
   height: 1px;
