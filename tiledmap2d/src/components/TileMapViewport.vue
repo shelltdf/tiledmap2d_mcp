@@ -37,6 +37,8 @@ const emit = defineEmits([
   'selection-add',
   'selection-toggle',
   'apply-tiles',
+  'pick-tile',
+  'selection-clear',
   'update:showGridOverlay',
   'update:showOriginMarker',
   'update:showCollisionVolume',
@@ -56,10 +58,18 @@ let selectGesture = null
 const boxSelectPreview = ref(null)
 /** 选择拖动过程中最后一次落在地图上的格（指针抬起在网格外时用） */
 let selectLastCell = null
+/** 无选区时填充/橡皮擦：拖动经过的所有格子 */
+let fillDrag = null
 /** 中键仅用于平移（button===1）；选择工具下也不再支持中键点选 */
 let middlePanState = 'idle'
 let toolBeforeSpace = null
 let spaceHoldListener = false
+/** 按住 Alt 临时吸取：松开后恢复的工具 */
+let toolBeforeAlt = null
+/** 是否已由 Alt 切入临时吸取（与左右 Alt 键计数配合） */
+let altHoldListener = false
+/** 当前仍按下的 Alt 键数量（左+右可同时按，需全松才恢复工具） */
+let altPhysicalKeyCount = 0
 let wrapResizeObserver = null
 
 const MIDDLE_BUTTONS_MASK = 4
@@ -246,6 +256,7 @@ function draw() {
 
   const showSel =
     props.activeTool === 'select' ||
+    props.activeTool === 'pick' ||
     props.activeTool === 'fill' ||
     props.activeTool === 'eraser'
   if (showSel && props.selectedCells?.length) {
@@ -320,14 +331,55 @@ function cellsInInclusiveRect(gx0, gy0, gx1, gy1, w, h) {
   return out
 }
 
+/** 线段经过的格子（含端点），整数网格 Bresenham，用于拖动时补全跳过的格 */
+function cellsAlongLine(gx0, gy0, gx1, gy1) {
+  const out = []
+  let x0 = gx0
+  let y0 = gy0
+  const x1 = gx1
+  const y1 = gy1
+  const dx = Math.abs(x1 - x0)
+  const dy = Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1
+  const sy = y0 < y1 ? 1 : -1
+  let err = dx - dy
+  for (;;) {
+    out.push({ gx: x0, gy: y0 })
+    if (x0 === x1 && y0 === y1) break
+    const e2 = 2 * err
+    if (e2 > -dy) {
+      err -= dy
+      x0 += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y0 += sy
+    }
+  }
+  return out
+}
+
 function applyMiddlePanDelta(dx, dy) {
   panX.value += dx
   panY.value += dy
 }
 
+function typingTarget(el) {
+  if (!el || typeof el !== 'object') return false
+  const t = el.tagName
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return true
+  if (el.isContentEditable) return true
+  return false
+}
+
 function onPointerDown(e) {
   if (!props.mapReady) return
   wrapRef.value?.focus()
+  if (e.button === 2 && props.activeTool === 'select') {
+    e.preventDefault()
+    emit('selection-clear')
+    return
+  }
   if (e.button === 1) {
     e.preventDefault()
     lastPanX = e.clientX
@@ -341,6 +393,14 @@ function onPointerDown(e) {
   innerRef.value?.setPointerCapture(e.pointerId)
   const cell = eventToCell(e)
   emit('cursor', cell)
+
+  if (props.activeTool === 'pick' && e.button === 0) {
+    if (cell) {
+      const tileId = tileIdAtActiveLayer(cell)
+      emit('pick-tile', { tileId })
+    }
+    return
+  }
 
   if (props.activeTool === 'select' && e.button === 0) {
     selectLastCell = cell
@@ -361,15 +421,30 @@ function onPointerDown(e) {
     (props.activeTool === 'fill' || props.activeTool === 'eraser') &&
     (e.button === 0 || e.button === 2)
   ) {
-    const cells =
-      props.selectedCells.length > 0
-        ? props.selectedCells
-        : cell
-          ? [{ gx: cell.gx, gy: cell.gy }]
-          : []
-    if (cells.length === 0) return
     const tileId =
       props.activeTool === 'eraser' || e.button === 2 ? 0 : props.selectedTileId
+    let cells
+    if (props.selectedCells.length > 0) {
+      fillDrag = null
+      /** 有选区时：必须点在选中的格子上才生效，点在选区外忽略 */
+      if (!cell) return
+      const onSelection = props.selectedCells.some(
+        (c) => c.gx === cell.gx && c.gy === cell.gy,
+      )
+      if (!onSelection) return
+      cells = props.selectedCells
+    } else {
+      if (!cell) return
+      cells = [{ gx: cell.gx, gy: cell.gy }]
+      fillDrag = {
+        button: e.button,
+        tileId,
+        lastGx: cell.gx,
+        lastGy: cell.gy,
+        pointerId: e.pointerId,
+      }
+    }
+    if (cells.length === 0) return
     emit('apply-tiles', { cells, tileId })
   }
 }
@@ -387,6 +462,22 @@ function onPointerMove(e) {
   }
   const cell = eventToCell(e)
   emit('cursor', cell)
+
+  if (
+    fillDrag &&
+    (props.activeTool === 'fill' || props.activeTool === 'eraser') &&
+    (fillDrag.button === 0 ? e.buttons & 1 : e.buttons & 2)
+  ) {
+    if (!cell) return
+    if (cell.gx === fillDrag.lastGx && cell.gy === fillDrag.lastGy) return
+    const line = cellsAlongLine(fillDrag.lastGx, fillDrag.lastGy, cell.gx, cell.gy)
+    const toFill = line.slice(1)
+    if (toFill.length === 0) return
+    fillDrag.lastGx = cell.gx
+    fillDrag.lastGy = cell.gy
+    emit('apply-tiles', { cells: toFill, tileId: fillDrag.tileId })
+    return
+  }
 
   if (props.activeTool === 'select' && selectGesture && e.buttons === 1) {
     if (cell) selectLastCell = cell
@@ -428,27 +519,23 @@ function finishSelectGesture(e) {
       w,
       h,
     )
-    const paletteTileId = tileIdAtActiveLayer(g.startCell)
     if (g.shiftKey) {
-      emit('selection-add', { cells, paletteTileId })
+      emit('selection-add', { cells })
     } else {
-      emit('selection-change', { cells, paletteTileId })
+      emit('selection-change', { cells })
     }
     draw()
     return
   }
 
   if (dist2 <= 25 && g.startCell) {
-    const paletteTileId = tileIdAtActiveLayer(g.startCell)
     if (g.ctrlKey) {
       emit('selection-toggle', {
         cell: g.startCell,
-        paletteTileId,
       })
     } else {
       emit('selection-change', {
         cells: [{ gx: g.startCell.gx, gy: g.startCell.gy }],
-        paletteTileId,
       })
     }
     draw()
@@ -469,6 +556,9 @@ function onPointerUp(e) {
     }
     return
   }
+  if (fillDrag && e.button === fillDrag.button) {
+    fillDrag = null
+  }
   if (props.activeTool === 'select' && e.button === 0) {
     finishSelectGesture(e)
   }
@@ -484,12 +574,14 @@ function onPointerUp(e) {
 /** 中键平移时指针可能移出画布矩形，不要用 leave 结束拖拽（否则像无法自由平移） */
 function onPointerLeave(e) {
   if (middlePanState === 'active') return
+  fillDrag = null
   onPointerUp(e)
 }
 
 function onPointerCancel(e) {
   middlePanState = 'idle'
   panning.value = false
+  fillDrag = null
   selectGesture = null
   boxSelectPreview.value = null
   try {
@@ -537,6 +629,43 @@ function onWindowSpaceUp(e) {
   spaceHoldListener = false
   emit('tool', toolBeforeSpace ?? 'fill')
   toolBeforeSpace = null
+}
+
+function onWindowAltDown(e) {
+  if (!props.mapReady) return
+  if (typingTarget(e.target)) return
+  if (e.code !== 'AltLeft' && e.code !== 'AltRight') return
+  if (e.repeat) return
+  e.preventDefault()
+  /** 与空格临时选择互斥，避免工具状态打架 */
+  if (spaceHoldListener) return
+  altPhysicalKeyCount += 1
+  if (altPhysicalKeyCount !== 1) return
+  if (altHoldListener) return
+  altHoldListener = true
+  toolBeforeAlt = props.activeTool
+  emit('tool', 'pick')
+}
+
+function onWindowAltUp(e) {
+  if (e.code !== 'AltLeft' && e.code !== 'AltRight') return
+  e.preventDefault()
+  altPhysicalKeyCount = Math.max(0, altPhysicalKeyCount - 1)
+  if (altPhysicalKeyCount > 0) return
+  if (!altHoldListener) return
+  altHoldListener = false
+  const restore = toolBeforeAlt
+  toolBeforeAlt = null
+  emit('tool', restore ?? 'fill')
+}
+
+function onWindowBlurRestoreAlt() {
+  altPhysicalKeyCount = 0
+  if (!altHoldListener) return
+  altHoldListener = false
+  const restore = toolBeforeAlt
+  toolBeforeAlt = null
+  emit('tool', restore ?? 'fill')
 }
 
 function fitView() {
@@ -606,6 +735,7 @@ function cursorForTool() {
   if (!props.mapReady) return 'default'
   if (panning.value) return 'grabbing'
   if (props.activeTool === 'select') return 'default'
+  if (props.activeTool === 'pick') return 'crosshair'
   if (props.activeTool === 'eraser') return 'cell'
   if (props.activeTool === 'fill') return 'crosshair'
   return 'crosshair'
@@ -625,6 +755,8 @@ function onWrapKeyDown(e) {
   if (e.code === 'Space') {
     e.preventDefault()
     if (e.repeat) return
+    /** 与 Alt 临时吸取互斥 */
+    if (altHoldListener) return
     if (!spaceHoldListener) {
       spaceHoldListener = true
       toolBeforeSpace = props.activeTool
@@ -681,6 +813,9 @@ function onWindowResize() {
 onMounted(async () => {
   draw()
   window.addEventListener('resize', onWindowResize)
+  window.addEventListener('keydown', onWindowAltDown, true)
+  window.addEventListener('keyup', onWindowAltUp, true)
+  window.addEventListener('blur', onWindowBlurRestoreAlt)
   await nextTick()
   if (wrapRef.value) {
     wrapResizeObserver = new ResizeObserver(() => {
@@ -696,6 +831,15 @@ onUnmounted(() => {
   wrapResizeObserver = null
   window.removeEventListener('resize', onWindowResize)
   window.removeEventListener('keyup', onWindowSpaceUp, true)
+  window.removeEventListener('keydown', onWindowAltDown, true)
+  window.removeEventListener('keyup', onWindowAltUp, true)
+  window.removeEventListener('blur', onWindowBlurRestoreAlt)
+  fillDrag = null
+  altPhysicalKeyCount = 0
+  if (altHoldListener) {
+    altHoldListener = false
+    toolBeforeAlt = null
+  }
 })
 </script>
 

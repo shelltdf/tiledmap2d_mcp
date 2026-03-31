@@ -11,7 +11,12 @@ const tools = [
   {
     id: 'select',
     label: '选择',
-    title: '选择：点选、Ctrl+点多选、拖框选、Shift+拖框追加',
+    title: '选择：点选、Ctrl+点多选、拖框、Shift+拖框追加；右键清空选区（不改变块库）',
+  },
+  {
+    id: 'pick',
+    label: '吸取',
+    title: '吸取：左键取当前编辑层该格的块到块库；任意时刻也可按住 Alt 临时吸取，松开还原',
   },
   {
     id: 'fill',
@@ -49,6 +54,21 @@ function choose(id) {
           <path
             d="M6 3l12 10-6 1.2L10.8 21 6 3z"
             fill="currentColor"
+          />
+        </svg>
+        <svg
+          v-else-if="t.id === 'pick'"
+          class="ctb-ico"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4 21l5-5m0 0l3-9 4-4 4 4-9 9-5 5M14.5 6.5L18 3l3 3-3.5 3.5M12 15l-2 2"
           />
         </svg>
         <svg

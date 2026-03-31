@@ -264,7 +264,14 @@ export function useTileMap() {
 
   function setActiveTool(tool) {
     const t = String(tool ?? '')
-    if (t !== 'select' && t !== 'fill' && t !== 'eraser') return
+    if (
+      t !== 'select' &&
+      t !== 'pick' &&
+      t !== 'fill' &&
+      t !== 'eraser'
+    ) {
+      return
+    }
     if (t === 'eraser') selectedCells.value = []
     activeTool.value = t
   }

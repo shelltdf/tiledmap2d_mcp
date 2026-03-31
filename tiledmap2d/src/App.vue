@@ -52,7 +52,7 @@ const statusMessage = computed(() => {
   if (!tm.hasMap) {
     return '当前无地图 — 请使用菜单「文件 → 新建」或「打开…」；有地图后才会显示块库（块表随地图文件）；支持保存为 JSON 与 TMX（Tiled）'
   }
-  return '就绪 — 填充/橡皮：左键填充选区或单格（无选区时仅当前格），右键擦除；选择：点选、Ctrl+点多选、拖框选、Shift+拖框追加；中键平移；块库选笔刷；空格临时切换选择；方向键平移视口；支持 JSON / TMX'
+  return '就绪 — 吸取：左键取块；任意工具按住 Alt 临时吸取，松开还原（与空格临时选择互斥）；选择：右键清空选区；填充/橡皮：左键填充选区或单格，右键擦除；点选、Ctrl+多选、拖框、Shift+追加；中键平移；空格临时选择；方向键平移；支持 JSON / TMX'
 })
 
 const cursorText = computed(() => {
@@ -202,19 +202,20 @@ function onClearMap() {
   tm.clearMap()
 }
 
-function onSelectionChange({ cells, paletteTileId }) {
+function onSelectionChange({ cells }) {
   tm.setSelection(cells)
-  if (paletteTileId != null) tm.setSelectedTileId(paletteTileId)
 }
 
-function onSelectionAdd({ cells, paletteTileId }) {
+function onSelectionAdd({ cells }) {
   tm.addCellsToSelection(cells)
-  if (paletteTileId != null) tm.setSelectedTileId(paletteTileId)
 }
 
-function onSelectionToggle({ cell, paletteTileId }) {
+function onSelectionToggle({ cell }) {
   tm.toggleCellInSelection(cell.gx, cell.gy)
-  if (paletteTileId != null) tm.setSelectedTileId(paletteTileId)
+}
+
+function onPickTile({ tileId }) {
+  tm.setSelectedTileId(tileId)
 }
 
 function onApplyTiles({ cells, tileId }) {
@@ -615,6 +616,8 @@ function onMenuShowFormats() {
           @selection-add="onSelectionAdd"
           @selection-toggle="onSelectionToggle"
           @apply-tiles="onApplyTiles"
+          @pick-tile="onPickTile"
+          @selection-clear="() => tm.clearSelection()"
           @set-zoom="(z) => tm.setZoom(z)"
           @update:show-grid-overlay="(v) => (showGridOverlay = v)"
           @update:show-origin-marker="(v) => (showOriginMarker = v)"
