@@ -29,6 +29,34 @@
   --win-status-inset-bottom: #a0a0a0;
 }
 
+/* 深色主题：由 JS 设置 html[data-theme="dark"]（含「跟随系统」解析结果） */
+html[data-theme='dark'] {
+  --win-bg: #2d2d2d;
+  --win-chrome: #383838;
+  --win-surface: #1e1e1e;
+  --win-border: #555555;
+  --win-border-strong: #666666;
+  --win-text: #e8e8e8;
+  --win-text-secondary: #b0b0b0;
+  --win-accent: #4aa3e0;
+  --win-accent-hover: #6bb8f0;
+  --win-accent-pressed: #2d8cc0;
+  --win-hover: #3c4c5c;
+  --win-list-active: #264f78;
+  --win-canvas-bg: #404040;
+  --win-shadow-panel: 1px 1px 0 rgba(255, 255, 255, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.35);
+  --win-shadow-dialog: 0 2px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --win-btn-face-top: #4a4a4a;
+  --win-btn-face-bottom: #353535;
+  --win-btn-border: #606060;
+  --win-btn-hover-top: #555555;
+  --win-btn-hover-bottom: #404040;
+  --win-menu-hover-bg: #0078d4;
+  --win-menu-hover-fg: #ffffff;
+  --win-status-inset-top: #505050;
+  --win-status-inset-bottom: #1a1a1a;
+}
+
 * {
   box-sizing: border-box;
 }

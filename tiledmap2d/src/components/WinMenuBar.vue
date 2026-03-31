@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, inject, computed } from 'vue'
 
 const emit = defineEmits([
   'new-map',
@@ -11,6 +11,11 @@ const emit = defineEmits([
   'clear',
   'show-formats',
 ])
+
+const shell = inject('appShell', null)
+const t = (path) => shell?.t?.(path) ?? path
+const locale = computed(() => shell?.locale?.value ?? 'zh')
+const themePreference = computed(() => shell?.themePreference?.value ?? 'system')
 
 const openId = ref(null)
 
@@ -28,6 +33,16 @@ function onDocClick(e) {
 
 function run(action) {
   emit(action)
+  close()
+}
+
+function setLang(code) {
+  shell?.setLocale?.(code)
+  close()
+}
+
+function setThemePref(pref) {
+  shell?.setThemePreference?.(pref)
   close()
 }
 
@@ -54,7 +69,7 @@ onUnmounted(() => {
         aria-haspopup="true"
         @click="toggle('file')"
       >
-        文件(<span class="mn">F</span>)
+        {{ t('menu.file') }}(<span class="mn">{{ t('menu.fileMn') }}</span>)
       </button>
       <div v-show="openId === 'file'" class="menu-dd" role="menu">
         <button
@@ -63,7 +78,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="run('new-map')"
         >
-          新建…
+          {{ t('menu.newMap') }}
         </button>
         <button
           type="button"
@@ -71,7 +86,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="run('open-json')"
         >
-          打开…
+          {{ t('menu.open') }}
         </button>
         <div class="menu-sep" />
         <button
@@ -80,7 +95,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="run('save')"
         >
-          保存
+          {{ t('menu.save') }}
         </button>
         <button
           type="button"
@@ -88,7 +103,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="run('save-as')"
         >
-          另存为…
+          {{ t('menu.saveAs') }}
         </button>
         <div class="menu-sep" />
         <button
@@ -97,7 +112,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="run('export-tmx')"
         >
-          导出 TMX…
+          {{ t('menu.exportTmx') }}
         </button>
         <button
           type="button"
@@ -105,7 +120,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="run('import-tmx')"
         >
-          导入 TMX…
+          {{ t('menu.importTmx') }}
         </button>
       </div>
     </div>
@@ -118,11 +133,90 @@ onUnmounted(() => {
         aria-haspopup="true"
         @click="toggle('edit')"
       >
-        编辑(<span class="mn">E</span>)
+        {{ t('menu.edit') }}(<span class="mn">{{ t('menu.editMn') }}</span>)
       </button>
       <div v-show="openId === 'edit'" class="menu-dd" role="menu">
         <button type="button" class="menu-item" role="menuitem" @click="run('clear')">
-          清空地图
+          {{ t('menu.clearMap') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="menu-top">
+      <button
+        type="button"
+        class="menu-title"
+        :aria-expanded="openId === 'lang'"
+        aria-haspopup="true"
+        @click="toggle('lang')"
+      >
+        {{ t('menu.language') }}(<span class="mn">{{ t('menu.languageMn') }}</span>)
+      </button>
+      <div v-show="openId === 'lang'" class="menu-dd" role="menu">
+        <button
+          type="button"
+          class="menu-item menu-item--check"
+          role="menuitem"
+          @click="setLang('zh')"
+        >
+          <span class="chk" :aria-hidden="true">{{ locale === 'zh' ? '✓' : '' }}</span>
+          {{ t('menu.langZh') }}
+        </button>
+        <button
+          type="button"
+          class="menu-item menu-item--check"
+          role="menuitem"
+          @click="setLang('en')"
+        >
+          <span class="chk" :aria-hidden="true">{{ locale === 'en' ? '✓' : '' }}</span>
+          {{ t('menu.langEn') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="menu-top">
+      <button
+        type="button"
+        class="menu-title"
+        :aria-expanded="openId === 'theme'"
+        aria-haspopup="true"
+        @click="toggle('theme')"
+      >
+        {{ t('menu.theme') }}(<span class="mn">{{ t('menu.themeMn') }}</span>)
+      </button>
+      <div v-show="openId === 'theme'" class="menu-dd" role="menu">
+        <button
+          type="button"
+          class="menu-item menu-item--check"
+          role="menuitem"
+          @click="setThemePref('system')"
+        >
+          <span class="chk" :aria-hidden="true">{{
+            themePreference === 'system' ? '✓' : ''
+          }}</span>
+          {{ t('menu.themeSystem') }}
+        </button>
+        <button
+          type="button"
+          class="menu-item menu-item--check"
+          role="menuitem"
+          @click="setThemePref('light')"
+        >
+          <span class="chk" :aria-hidden="true">{{
+            themePreference === 'light' ? '✓' : ''
+          }}</span>
+          {{ t('menu.themeLight') }}
+        </button>
+        <button
+          type="button"
+          class="menu-item menu-item--check"
+          role="menuitem"
+          @click="setThemePref('dark')"
+        >
+          <span class="chk" :aria-hidden="true">{{
+            themePreference === 'dark' ? '✓' : ''
+          }}</span>
+          {{ t('menu.themeDark') }}
         </button>
       </div>
     </div>
@@ -135,7 +229,7 @@ onUnmounted(() => {
         aria-haspopup="true"
         @click="toggle('help')"
       >
-        帮助(<span class="mn">H</span>)
+        {{ t('menu.help') }}(<span class="mn">{{ t('menu.helpMn') }}</span>)
       </button>
       <div v-show="openId === 'help'" class="menu-dd" role="menu">
         <button
@@ -144,7 +238,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="run('show-formats')"
         >
-          支持的文件格式…
+          {{ t('menu.formats') }}
         </button>
       </div>
     </div>
@@ -198,7 +292,9 @@ onUnmounted(() => {
   z-index: 50;
 }
 .menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   text-align: left;
   font: inherit;
@@ -208,6 +304,15 @@ onUnmounted(() => {
   background: transparent;
   color: var(--win-text);
   cursor: pointer;
+}
+.menu-item--check {
+  padding-left: 8px;
+}
+.chk {
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  font-size: 11px;
 }
 .menu-item:hover,
 .menu-item:focus-visible {

@@ -1,8 +1,13 @@
 <script setup>
+import { inject } from 'vue'
+
 defineProps({
   /** 已创建或打开过地图，可编辑画布与导出 */
   mapReady: { type: Boolean, default: true },
 })
+
+const shell = inject('appShell', null)
+const tt = (path) => shell?.t?.(path) ?? path
 
 const emit = defineEmits([
   'open-new-map',
@@ -18,8 +23,8 @@ const emit = defineEmits([
       <button
         type="button"
         class="win-btn tb-icon-btn"
-        title="新建地图…"
-        aria-label="新建地图"
+        :title="tt('toolbar.newMap')"
+        :aria-label="tt('toolbar.newMap')"
         @click="emit('open-new-map')"
       >
         <svg class="tb-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -48,8 +53,8 @@ const emit = defineEmits([
       <button
         type="button"
         class="win-btn tb-icon-btn"
-        title="地图设置…"
-        aria-label="地图设置"
+        :title="tt('toolbar.mapSettings')"
+        :aria-label="tt('toolbar.mapSettings')"
         :disabled="!mapReady"
         @click="emit('open-map-settings')"
       >
@@ -69,8 +74,8 @@ const emit = defineEmits([
       <button
         type="button"
         class="win-btn primary tb-icon-btn"
-        title="导出 TMX"
-        aria-label="导出 TMX"
+        :title="tt('toolbar.exportTmx')"
+        :aria-label="tt('toolbar.exportTmx')"
         :disabled="!mapReady"
         @click="emit('export-tmx')"
       >
@@ -87,8 +92,8 @@ const emit = defineEmits([
       </button>
       <label
         class="win-btn file-label tb-icon-btn"
-        title="导入 TMX"
-        aria-label="导入 TMX"
+        :title="tt('toolbar.importTmx')"
+        :aria-label="tt('toolbar.importTmx')"
       >
         <svg class="tb-ico" viewBox="0 0 24 24" aria-hidden="true">
           <path

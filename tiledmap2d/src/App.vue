@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch, provide } from 'vue'
 import { useTileMap } from './composables/useTileMap.js'
 import { exportTmx, parseTmxToMapPayload } from './utils/tmx.js'
 import { averageColorFromDataUrl } from './utils/tileImage.js'
@@ -15,8 +15,32 @@ import AddLayerDialog from './components/AddLayerDialog.vue'
 import MapSettingsDialog from './components/MapSettingsDialog.vue'
 import WinStatusBar from './components/WinStatusBar.vue'
 import PixelEditorDialog from './components/PixelEditorDialog.vue'
+import LogDialog from './components/LogDialog.vue'
+import { useAppLog } from './composables/useAppLog.js'
+import { useAppTheme } from './composables/useAppTheme.js'
+import { useAppI18n } from './composables/useAppI18n.js'
 
 const tm = reactive(useTileMap())
+const { locale, setLocale, t } = useAppI18n()
+const { themePreference, setThemePreference } = useAppTheme()
+const appLog = useAppLog()
+const logOpen = ref(false)
+
+provide('appShell', {
+  t,
+  locale,
+  setLocale,
+  themePreference,
+  setThemePreference,
+  log: appLog,
+})
+
+watch(
+  () => tm.lastError,
+  (msg) => {
+    if (msg) appLog.error(msg)
+  },
+)
 const formatsOpen = ref(false)
 const addLayerOpen = ref(false)
 const mapSettingsOpen = ref(false)
@@ -49,18 +73,16 @@ const rightDockEdgeActive = computed(
 
 const statusMessage = computed(() => {
   if (tm.lastError) return tm.lastError
-  if (!tm.hasMap) {
-    return '当前无地图 — 请使用菜单「文件 → 新建」或「打开…」；有地图后才会显示块库（块表随地图文件）；支持保存为 JSON 与 TMX（Tiled）'
-  }
-  return '就绪 — 吸取：左键取块；任意工具按住 Alt 临时吸取，松开还原（与空格临时选择互斥）；选择：右键清空选区；填充/橡皮：左键填充选区或单格，右键擦除；点选、Ctrl+多选、拖框、Shift+追加；中键平移；空格临时选择；方向键平移；支持 JSON / TMX'
+  if (!tm.hasMap) return t('status.noMap')
+  return t('status.ready')
 })
 
 const cursorText = computed(() => {
-  if (!tm.hasMap) return '无地图'
+  if (!tm.hasMap) return t('status.noMapShort')
   const c = tm.cursorCell
   if (!c) return ''
   const layer = tm.activeLayerName ? ` | ${tm.activeLayerName}` : ''
-  return `光标: ${c.gx}, ${c.gy}${layer}`
+  return `${t('status.cursor')}: ${c.gx}, ${c.gy}${layer}`
 })
 
 const zoomText = computed(() => `${tm.zoomPercent}%`)
@@ -257,6 +279,7 @@ function onMapSettingsConfirm({ width, height, tileSize }) {
     }
     tm.newMap(width, height, tileSize)
     mapFileHandle.value = null
+    appLog.info(t('log.newMapCreated'))
   }
 }
 
@@ -285,6 +308,7 @@ function onSaveAsDownload() {
   }
   downloadJsonFile(json, mapFileSuggestedName.value || 'tiledmap2d.json')
   tm.clearError()
+  appLog.info(t('log.savedDownload'))
 }
 
 async function onMenuSave() {
@@ -297,6 +321,7 @@ async function onMenuSave() {
     try {
       await writeJsonToFileHandle(mapFileHandle.value, json)
       tm.clearError()
+      appLog.info(t('log.saved'))
     } catch {
       tm.setError('保存失败')
     }
@@ -326,6 +351,7 @@ async function onMenuSaveAs() {
       mapFileHandle.value = handle
       mapFileSuggestedName.value = handle.name || 'tiledmap2d.json'
       tm.clearError()
+      appLog.info(t('log.saved'))
     } catch (e) {
       if (e?.name === 'AbortError') return
       onSaveAsDownload()
@@ -371,6 +397,7 @@ async function onMenuOpen() {
       mapFileHandle.value = handle
       mapFileSuggestedName.value = file.name || 'tiledmap2d.json'
       tm.clearError()
+      appLog.info(t('log.importedJson'))
     } catch (e) {
       if (e?.name === 'AbortError') return
       skipImportConfirm.value = true
@@ -403,6 +430,7 @@ function onImport(file) {
       mapFileHandle.value = null
       mapFileSuggestedName.value = file.name || 'tiledmap2d.json'
       tm.clearError()
+      appLog.info(t('log.importedJson'))
     }
   }
   reader.onerror = () => tm.setError('文件读取失败')
@@ -433,6 +461,7 @@ function onExportTmx() {
   a.click()
   URL.revokeObjectURL(url)
   tm.clearError()
+  appLog.info(t('log.exportedTmx'))
 }
 
 function onImportTmx(file) {
@@ -457,6 +486,7 @@ function onImportTmx(file) {
     else {
       mapFileHandle.value = null
       tm.clearError()
+      appLog.info(t('log.importedTmx'))
     }
   }
   reader.onerror = () => tm.setError('文件读取失败')
@@ -476,8 +506,8 @@ function onMenuShowFormats() {
   <div class="win-app">
     <header class="win-caption">
       <div class="caption-icon" aria-hidden="true" />
-      <span class="caption-title">TiledMap2D</span>
-      <span class="caption-sub">二维正交瓦片 · 非 GIS 球面切片</span>
+      <span class="caption-title">{{ t('caption.title') }}</span>
+      <span class="caption-sub">{{ t('caption.sub') }}</span>
     </header>
 
     <WinMenuBar
@@ -523,6 +553,12 @@ function onMenuShowFormats() {
     />
 
     <FormatsHelpDialog :open="formatsOpen" @close="formatsOpen = false" />
+
+    <LogDialog
+      :open="logOpen"
+      :entries="appLog.entries"
+      @close="logOpen = false"
+    />
 
     <AddLayerDialog
       :open="addLayerOpen"
@@ -677,6 +713,8 @@ function onMenuShowFormats() {
       :message="statusMessage"
       :cursor-text="cursorText"
       :zoom-text="zoomText"
+      :log-hint="t('status.clickOpenLog')"
+      @open-log="logOpen = true"
     />
   </div>
 </template>
@@ -696,7 +734,11 @@ function onMenuShowFormats() {
   align-items: center;
   gap: 10px;
   padding: 8px 12px 9px;
-  background: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
+  background: linear-gradient(
+    180deg,
+    var(--win-surface) 0%,
+    var(--win-chrome) 100%
+  );
   border-bottom: 1px solid var(--win-border-strong);
   user-select: none;
   flex-shrink: 0;
