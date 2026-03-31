@@ -1,17 +1,23 @@
 import { ref, computed, shallowRef } from 'vue'
+import { averageColorFromDataUrl } from '../utils/tileImage.js'
 
 /** 默认块库（新建地图时的初始 palette） */
 export const DEFAULT_TILE_TYPES = [
-  { id: 0, name: '空', color: null },
-  { id: 1, name: '草地', color: '#6ebf4a' },
-  { id: 2, name: '水', color: '#3b8fd9' },
-  { id: 3, name: '沙地', color: '#d4c4a8' },
-  { id: 4, name: '石砖', color: '#8a8a8a' },
-  { id: 5, name: '木', color: '#a67c52' },
+  { id: 0, name: '空', color: null, imageDataUrl: null },
+  { id: 1, name: '草地', color: '#6ebf4a', imageDataUrl: null },
+  { id: 2, name: '水', color: '#3b8fd9', imageDataUrl: null },
+  { id: 3, name: '沙地', color: '#d4c4a8', imageDataUrl: null },
+  { id: 4, name: '石砖', color: '#8a8a8a', imageDataUrl: null },
+  { id: 5, name: '木', color: '#a67c52', imageDataUrl: null },
 ]
 
 function cloneTileTypes(source = DEFAULT_TILE_TYPES) {
-  return source.map((t) => ({ id: t.id, name: t.name, color: t.color }))
+  return source.map((t) => ({
+    id: t.id,
+    name: t.name,
+    color: t.color,
+    imageDataUrl: t.imageDataUrl ?? null,
+  }))
 }
 
 const MAP_VERSION = 3
@@ -308,6 +314,11 @@ export function useTileMap() {
       width: width.value,
       height: height.value,
       activeLayerIndex: activeLayerIndex.value,
+      tileTypes: tileTypes.value.map((t) => ({
+        name: t.name,
+        color: t.color,
+        imageDataUrl: t.imageDataUrl ?? null,
+      })),
       layers: layers.value.map((L) => ({
         name: L.name,
         visible: L.visible,
@@ -343,6 +354,50 @@ export function useTileMap() {
     return parsed
   }
 
+  /**
+   * 与 importTileTypesJson 同结构的块数组，写入 tileTypes
+   * @returns {string|null} 错误信息或 null
+   */
+  function applyTileTypesFromJsonArray(arr) {
+    if (!Array.isArray(arr) || arr.length < 1) {
+      return 'tile类型数组无效'
+    }
+    if (arr.length > 256) return '块类型数量过多（≤256）'
+    const next = []
+    for (let i = 0; i < arr.length; i++) {
+      const raw = arr[i]
+      if (!raw || typeof raw !== 'object') return `第 ${i} 项无效`
+      const name = String(raw.name ?? '').trim() || `块 ${i}`
+      let color = raw.color
+      if (i === 0) {
+        color = null
+      } else {
+        if (color === undefined || color === null || color === '') {
+          color = '#888888'
+        } else {
+          color = String(color).trim()
+          if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+            return `第 ${i} 项颜色须为 #RRGGBB`
+          }
+        }
+      }
+      let imageDataUrl = null
+      if (i !== 0 && raw.imageDataUrl != null && raw.imageDataUrl !== '') {
+        imageDataUrl = String(raw.imageDataUrl)
+        if (!imageDataUrl.startsWith('data:image/')) {
+          return `第 ${i} 项 imageDataUrl 须为 data:image/*`
+        }
+      }
+      next.push({ id: i, name, color, imageDataUrl })
+    }
+    tileTypes.value = next
+    remapTilesToPaletteLength(next.length)
+    if (selectedTileId.value >= next.length) {
+      selectedTileId.value = Math.max(0, next.length - 1)
+    }
+    return null
+  }
+
   function validateAndLoad(data) {
     const ver = Number(data.version)
     const tw = Number(data.width)
@@ -351,6 +406,11 @@ export function useTileMap() {
     if (!Number.isInteger(tw) || tw < 1 || tw > 256) return 'width 无效'
     if (!Number.isInteger(th) || th < 1 || th > 256) return 'height 无效'
     if (!Number.isInteger(ts) || ts < 8 || ts > 128) return 'tileSize 无效'
+
+    if (Array.isArray(data.tileTypes) && data.tileTypes.length > 0) {
+      const terr = applyTileTypesFromJsonArray(data.tileTypes)
+      if (terr) return `tileTypes：${terr}`
+    }
 
     const maxId = tileTypes.value.length
 
@@ -422,7 +482,7 @@ export function useTileMap() {
 
   /**
    * 从 JSON 导入块库。支持顶层数组，或 `{ "types": [...] }`。
-   * 每项：`{ "name": string, "color": "#RRGGBB" | null }`，首项视为「空」，颜色强制为 null。
+   * 每项：`{ name, color, imageDataUrl? }`，首项为「空」。
    */
   function importTileTypesJson(text) {
     let data
@@ -435,39 +495,35 @@ export function useTileMap() {
     if (!Array.isArray(arr) || arr.length < 1) {
       return '需要 JSON 数组，或包含 types 数组的对象'
     }
-    if (arr.length > 256) return '块类型数量过多（≤256）'
-    const next = []
-    for (let i = 0; i < arr.length; i++) {
-      const raw = arr[i]
-      if (!raw || typeof raw !== 'object') return `第 ${i} 项无效`
-      const name = String(raw.name ?? '').trim() || `块 ${i}`
-      let color = raw.color
-      if (i === 0) {
-        color = null
-      } else {
-        if (color === undefined || color === null || color === '') {
-          color = '#888888'
-        } else {
-          color = String(color).trim()
-          if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-            return `第 ${i} 项颜色须为 #RRGGBB`
-          }
-        }
-      }
-      next.push({ id: i, name, color })
+    const err = applyTileTypesFromJsonArray(arr)
+    if (err) return err
+    clearError()
+    return null
+  }
+
+  /** 从图片 data URL 追加一种块类型 */
+  async function addTileTypeFromImage(name, dataUrl) {
+    if (tileTypes.value.length >= 256) return '块类型过多（≤256）'
+    const baseName = String(name ?? '').trim() || `块 ${tileTypes.value.length}`
+    let color
+    try {
+      color = await averageColorFromDataUrl(dataUrl)
+    } catch {
+      return '图片解析失败'
     }
-    tileTypes.value = next
-    remapTilesToPaletteLength(next.length)
-    if (selectedTileId.value >= next.length) {
-      selectedTileId.value = Math.max(0, next.length - 1)
-    }
+    const id = tileTypes.value.length
+    tileTypes.value = [
+      ...tileTypes.value,
+      { id, name: baseName, color, imageDataUrl: dataUrl },
+    ]
+    selectedTileId.value = id
     clearError()
     return null
   }
 
   /**
    * @param {number} id
-   * @param {{ name?: string, color?: string | null }} patch
+   * @param {{ name?: string, color?: string | null, imageDataUrl?: string | null }} patch
    */
   function updateTileType(id, patch) {
     if (id < 0 || id >= tileTypes.value.length) return '无效的块 id'
@@ -475,18 +531,31 @@ export function useTileMap() {
     const name = patch.name != null ? String(patch.name).trim() : t.name
     if (!name) return '名称不能为空'
     let color = t.color
+    let imageDataUrl = t.imageDataUrl ?? null
     if (id === 0) {
       color = null
-    } else if (patch.color !== undefined) {
-      const c =
-        patch.color === null || patch.color === ''
-          ? '#888888'
-          : String(patch.color).trim()
-      if (!/^#[0-9a-fA-F]{6}$/.test(c)) return '颜色须为 #RRGGBB'
-      color = c
+      imageDataUrl = null
+    } else {
+      if (patch.color !== undefined) {
+        const c =
+          patch.color === null || patch.color === ''
+            ? '#888888'
+            : String(patch.color).trim()
+        if (!/^#[0-9a-fA-F]{6}$/.test(c)) return '颜色须为 #RRGGBB'
+        color = c
+      }
+      if (patch.imageDataUrl !== undefined) {
+        if (patch.imageDataUrl === null || patch.imageDataUrl === '') {
+          imageDataUrl = null
+        } else {
+          const u = String(patch.imageDataUrl)
+          if (!u.startsWith('data:image/')) return 'imageDataUrl 须为 data:image/*'
+          imageDataUrl = u
+        }
+      }
     }
     const next = tileTypes.value.slice()
-    next[id] = { ...t, id, name, color }
+    next[id] = { ...t, id, name, color, imageDataUrl }
     tileTypes.value = next
     clearError()
     return null
@@ -532,6 +601,7 @@ export function useTileMap() {
   return {
     tileTypes,
     importTileTypesJson,
+    addTileTypeFromImage,
     updateTileType,
     deleteTileType,
     width,

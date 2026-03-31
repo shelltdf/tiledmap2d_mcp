@@ -16,9 +16,12 @@ const props = defineProps({
   activeLayerIndex: { type: Number, required: true },
   pickedCell: { type: Object, default: null },
   tileTypes: { type: Array, required: true },
-  showGridOverlay: { type: Boolean, default: false },
+  /** 为 true 时绘制棋盘格底色；为 false 时不铺底，空白格透明以透出视口背景（「网格」即指此棋盘格） */
+  showGridOverlay: { type: Boolean, default: true },
+  /** 原点格描边 + (0,0) 与 (1,1) 坐标文字 */
   showOriginMarker: { type: Boolean, default: false },
-  showRefLabels: { type: Boolean, default: false },
+  /** 碰撞体积叠加（有数据时再绘制） */
+  showCollisionVolume: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -30,7 +33,7 @@ const emit = defineEmits([
   'set-zoom',
   'update:showGridOverlay',
   'update:showOriginMarker',
-  'update:showRefLabels',
+  'update:showCollisionVolume',
 ])
 
 const canvasRef = ref(null)
@@ -53,6 +56,9 @@ const MIDDLE_BUTTONS_MASK = 4
 const KEY_SCROLL_STEP = 48
 /** 适应窗口时，可视区与地图之间的最小边距（px） */
 const VIEW_SCROLL_MARGIN_MIN = 64
+
+/** data URL -> HTMLImageElement，避免重复解码 */
+const tileTextureCache = new Map()
 
 function colorForTileId(id) {
   const t = props.tileTypes.find((x) => x.id === id)
@@ -80,15 +86,18 @@ function draw() {
 
   const light = '#fafafa'
   const dark = '#e8e8e8'
-  for (let gy = 0; gy < props.height; gy++) {
-    for (let gx = 0; gx < props.width; gx++) {
-      const x = gx * cell
-      const y = gy * cell
-      const odd = (gx + gy) % 2 === 0
-      ctx.fillStyle = odd ? light : dark
-      ctx.fillRect(x, y, cell, cell)
+  if (props.showGridOverlay) {
+    for (let gy = 0; gy < props.height; gy++) {
+      for (let gx = 0; gx < props.width; gx++) {
+        const x = gx * cell
+        const y = gy * cell
+        const odd = (gx + gy) % 2 === 0
+        ctx.fillStyle = odd ? light : dark
+        ctx.fillRect(x, y, cell, cell)
+      }
     }
   }
+  /* 关闭网格时不铺浅色整块底，空白格保持透明，与 .viewport-shell 的 win-canvas-bg 一致，避免出现「大白块」 */
 
   for (const layer of props.layers) {
     if (!layer?.visible) continue
@@ -100,42 +109,31 @@ function draw() {
     if (!layer.tiles) continue
     for (let gy = 0; gy < props.height; gy++) {
       for (let gx = 0; gx < props.width; gx++) {
-        const id = layer.tiles[gy]?.[gx] ?? 0
-        if (id === 0) continue
+        const tid = layer.tiles[gy]?.[gx] ?? 0
+        if (tid === 0) continue
         const x = gx * cell
         const y = gy * cell
-        ctx.fillStyle = colorForTileId(id)
-        ctx.fillRect(x, y, cell, cell)
+        const tp = props.tileTypes[tid]
+        const url = tp?.imageDataUrl
+        if (url) {
+          let img = tileTextureCache.get(url)
+          if (!img) {
+            img = new Image()
+            img.onload = () => draw()
+            tileTextureCache.set(url, img)
+            img.src = url
+          }
+          if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, x, y, cell, cell)
+          } else {
+            ctx.fillStyle = colorForTileId(tid)
+            ctx.fillRect(x, y, cell, cell)
+          }
+        } else {
+          ctx.fillStyle = colorForTileId(tid)
+          ctx.fillRect(x, y, cell, cell)
+        }
       }
-    }
-  }
-
-  for (let gy = 0; gy < props.height; gy++) {
-    for (let gx = 0; gx < props.width; gx++) {
-      const x = gx * cell
-      const y = gy * cell
-      ctx.strokeStyle = 'rgba(0,0,0,0.08)'
-      ctx.lineWidth = 1
-      ctx.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1)
-    }
-  }
-
-  if (props.showGridOverlay) {
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)'
-    ctx.lineWidth = 1
-    for (let gx = 0; gx <= props.width; gx++) {
-      const x = gx * cell + 0.5
-      ctx.beginPath()
-      ctx.moveTo(x, 0)
-      ctx.lineTo(x, ch)
-      ctx.stroke()
-    }
-    for (let gy = 0; gy <= props.height; gy++) {
-      const y = gy * cell + 0.5
-      ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(cw, y)
-      ctx.stroke()
     }
   }
 
@@ -143,9 +141,6 @@ function draw() {
     ctx.strokeStyle = '#c42b1c'
     ctx.lineWidth = 2
     ctx.strokeRect(1.5, 1.5, cell - 3, cell - 3)
-  }
-
-  if (props.showRefLabels && props.width > 0 && props.height > 0) {
     ctx.font = `${Math.max(10, Math.min(14, cell * 0.35))}px Segoe UI, system-ui, sans-serif`
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.textBaseline = 'top'
@@ -153,6 +148,10 @@ function draw() {
     if (props.width >= 2 && props.height >= 2) {
       ctx.fillText('(1,1)', cell + 4, cell + 3)
     }
+  }
+
+  if (props.showCollisionVolume) {
+    /* 碰撞体积数据接入后在此绘制叠加层 */
   }
 
   const p = props.pickedCell
@@ -455,7 +454,7 @@ watch(
     props.activeLayerIndex,
     props.showGridOverlay,
     props.showOriginMarker,
-    props.showRefLabels,
+    props.showCollisionVolume,
   ],
   () => draw(),
   { deep: true }
@@ -542,10 +541,10 @@ onUnmounted(() => {
           <CanvasDisplayPanel
             :show-grid="showGridOverlay"
             :show-origin="showOriginMarker"
-            :show-ref-labels="showRefLabels"
+            :show-collision-volume="showCollisionVolume"
             @update:show-grid="emit('update:showGridOverlay', $event)"
             @update:show-origin="emit('update:showOriginMarker', $event)"
-            @update:show-ref-labels="emit('update:showRefLabels', $event)"
+            @update:show-collision-volume="emit('update:showCollisionVolume', $event)"
           />
         </div>
       </div>

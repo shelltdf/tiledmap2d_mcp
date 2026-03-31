@@ -6,23 +6,19 @@ defineProps({
 
 const emit = defineEmits([
   'select',
-  'import-types',
+  'import-image',
   'edit-type',
   'delete-type',
   'collapse',
 ])
 
-function onImportFile(e) {
+function onImportImage(e) {
   const input = e.target
   const f = input.files?.[0]
   input.value = ''
   if (!f) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    emit('import-types', String(reader.result ?? ''))
-  }
-  reader.onerror = () => {}
-  reader.readAsText(f, 'UTF-8')
+  if (!/^image\//.test(f.type)) return
+  emit('import-image', f)
 }
 </script>
 
@@ -41,13 +37,13 @@ function onImportFile(e) {
       </button>
     </div>
     <div class="palette-toolbar">
-      <label class="pal-btn">
+      <label class="pal-btn" title="导入图片，追加为新块类型">
         导入
         <input
           type="file"
           class="pal-file"
-          accept="application/json,.json"
-          @change="onImportFile"
+          accept="image/png,image/jpeg,image/gif,image/webp,image/*"
+          @change="onImportImage"
         />
       </label>
       <button type="button" class="pal-btn" @click="emit('edit-type')">
@@ -67,8 +63,14 @@ function onImportFile(e) {
         :title="t.name"
         @click="emit('select', Number(t.id))"
       >
+        <img
+          v-if="t.imageDataUrl"
+          class="swatch-img"
+          :src="t.imageDataUrl"
+          alt=""
+        />
         <span
-          v-if="t.color"
+          v-else-if="t.color"
           class="swatch-fill"
           :style="{ background: t.color }"
         />
@@ -177,6 +179,15 @@ label.pal-btn {
   outline: 2px solid var(--win-accent);
   outline-offset: -1px;
   background: var(--win-list-active);
+}
+.swatch-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  object-fit: cover;
+  flex-shrink: 0;
+  image-rendering: pixelated;
 }
 .swatch-fill {
   width: 28px;

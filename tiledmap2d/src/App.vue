@@ -2,6 +2,7 @@
 import { ref, reactive, computed } from 'vue'
 import { useTileMap } from './composables/useTileMap.js'
 import { exportTmx, parseTmxToMapPayload } from './utils/tmx.js'
+import { averageColorFromDataUrl } from './utils/tileImage.js'
 import WinMenuBar from './components/WinMenuBar.vue'
 import FormatsHelpDialog from './components/FormatsHelpDialog.vue'
 import WinToolbar from './components/WinToolbar.vue'
@@ -13,15 +14,19 @@ import TileMapViewport from './components/TileMapViewport.vue'
 import AddLayerDialog from './components/AddLayerDialog.vue'
 import MapSettingsDialog from './components/MapSettingsDialog.vue'
 import WinStatusBar from './components/WinStatusBar.vue'
+import PixelEditorDialog from './components/PixelEditorDialog.vue'
 
 const tm = reactive(useTileMap())
 const formatsOpen = ref(false)
 const addLayerOpen = ref(false)
 const mapSettingsOpen = ref(false)
 const mapSettingsMode = ref('new')
-const showGridOverlay = ref(false)
+const pixelEditorOpen = ref(false)
+/** 打开像素编辑时锁定的块 id（避免编辑中途切换选中导致写错块） */
+const editingTileTypeId = ref(0)
+const showGridOverlay = ref(true)
 const showOriginMarker = ref(false)
-const showRefLabels = ref(false)
+const showCollisionVolume = ref(false)
 const importJsonEl = ref(null)
 const importTmxEl = ref(null)
 
@@ -75,36 +80,52 @@ function selectTile(id) {
   tm.setSelectedTileId(id)
 }
 
-function onImportTileTypes(text) {
-  const err = tm.importTileTypesJson(text)
-  if (err) tm.setError(err)
+function onImportTileImage(file) {
+  const reader = new FileReader()
+  reader.onload = async () => {
+    const dataUrl = String(reader.result ?? '')
+    const base =
+      String(file.name ?? '')
+        .replace(/\.[^.]+$/, '')
+        .trim() || `块 ${tm.tileTypes.length}`
+    const err = await tm.addTileTypeFromImage(base, dataUrl)
+    if (err) tm.setError(err)
+  }
+  reader.onerror = () => tm.setError('图片读取失败')
+  reader.readAsDataURL(file)
 }
 
 function onEditTileType() {
   const id = tm.selectedTileId
-  const types = tm.tileTypes
-  const t = types[id]
+  const t = tm.tileTypes[id]
   if (!t) return
-  const name = window.prompt('块名称', t.name)
-  if (name === null) return
-  const trimmed = String(name).trim()
-  if (!trimmed) {
-    tm.setError('名称不能为空')
-    return
-  }
   if (id === 0) {
+    const name = window.prompt('「空」类型名称', t.name)
+    if (name === null) return
+    const trimmed = String(name).trim()
+    if (!trimmed) {
+      tm.setError('名称不能为空')
+      return
+    }
     const err = tm.updateTileType(id, { name: trimmed })
     if (err) tm.setError(err)
     return
   }
-  const c = window.prompt('颜色 (#RRGGBB)', t.color ?? '#888888')
-  if (c === null) return
-  const tc = String(c).trim()
-  if (!tc || !/^#[0-9a-fA-F]{6}$/.test(tc)) {
-    tm.setError('颜色须为 #RRGGBB')
-    return
+  editingTileTypeId.value = id
+  pixelEditorOpen.value = true
+}
+
+async function onPixelEditorSave(dataUrl) {
+  const id = editingTileTypeId.value
+  const t = tm.tileTypes[id]
+  if (!t || id === 0) return
+  let color
+  try {
+    color = await averageColorFromDataUrl(dataUrl)
+  } catch {
+    color = t.color ?? '#888888'
   }
-  const err = tm.updateTileType(id, { name: trimmed, color: tc })
+  const err = tm.updateTileType(id, { imageDataUrl: dataUrl, color })
   if (err) tm.setError(err)
 }
 
@@ -139,7 +160,19 @@ function onLayerRenameActive() {
 }
 
 function onLayerRemoveActive() {
-  tm.removeLayer(tm.activeLayerIndex)
+  const index = tm.activeLayerIndex
+  const L = tm.layers[index]
+  if (!L) return
+  if (tm.layers.length <= 1) {
+    tm.setError('至少保留一个图层')
+    return
+  }
+  if (
+    !window.confirm(`确定删除图层「${L.name}」？此操作不可撤销。`)
+  ) {
+    return
+  }
+  tm.removeLayer(index)
 }
 
 function onPickTile({ gx, gy, tileId }) {
@@ -305,6 +338,18 @@ function onMenuShowFormats() {
       @confirm="onMapSettingsConfirm"
     />
 
+    <PixelEditorDialog
+      :open="pixelEditorOpen"
+      :tile-size="tm.tileSize"
+      :initial-data-url="
+        tm.tileTypes[editingTileTypeId]?.imageDataUrl ?? null
+      "
+      :fallback-color="tm.tileTypes[editingTileTypeId]?.color ?? '#888888'"
+      :type-name="tm.tileTypes[editingTileTypeId]?.name ?? ''"
+      @close="pixelEditorOpen = false"
+      @save="onPixelEditorSave"
+    />
+
     <WinToolbar
       @open-new-map="openNewMapDialog"
       @open-map-settings="openEditMapSettingsDialog"
@@ -364,7 +409,7 @@ function onMenuShowFormats() {
           :tile-types="tm.tileTypes"
           :show-grid-overlay="showGridOverlay"
           :show-origin-marker="showOriginMarker"
-          :show-ref-labels="showRefLabels"
+          :show-collision-volume="showCollisionVolume"
           @paint="onPaint"
           @cursor="onCursor"
           @zoom-wheel="onZoomWheel"
@@ -373,7 +418,7 @@ function onMenuShowFormats() {
           @set-zoom="(z) => tm.setZoom(z)"
           @update:show-grid-overlay="(v) => (showGridOverlay = v)"
           @update:show-origin-marker="(v) => (showOriginMarker = v)"
-          @update:show-ref-labels="(v) => (showRefLabels = v)"
+          @update:show-collision-volume="(v) => (showCollisionVolume = v)"
         />
       </div>
       <div class="dock-shelf dock-shelf--right">
@@ -386,7 +431,7 @@ function onMenuShowFormats() {
             :types="tm.tileTypes"
             :selected-id="tm.selectedTileId"
             @select="selectTile"
-            @import-types="onImportTileTypes"
+            @import-image="onImportTileImage"
             @edit-type="onEditTileType"
             @delete-type="onDeleteTileType"
             @collapse="dockPaletteCollapsed = true"
@@ -395,6 +440,7 @@ function onMenuShowFormats() {
             v-show="!dockBlockDefCollapsed"
             :types="tm.tileTypes"
             :selected-id="tm.selectedTileId"
+            :tile-size="tm.tileSize"
             @collapse="dockBlockDefCollapsed = true"
           />
         </div>

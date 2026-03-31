@@ -1,21 +1,24 @@
 <script setup>
 defineProps({
-  showGrid: { type: Boolean, default: false },
+  showGrid: { type: Boolean, default: true },
   showOrigin: { type: Boolean, default: false },
-  showRefLabels: { type: Boolean, default: false },
+  showCollisionVolume: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
   'update:showGrid',
   'update:showOrigin',
-  'update:showRefLabels',
+  'update:showCollisionVolume',
 ])
 </script>
 
 <template>
   <div class="dtb win-panel" role="group" aria-label="显示辅助">
     <div class="dtb-title">显示</div>
-    <label class="dtb-row">
+    <label
+      class="dtb-row"
+      title="棋盘格深浅底纹；关闭后空白格透明，与视口背景一致"
+    >
       <input
         type="checkbox"
         :checked="showGrid"
@@ -23,7 +26,10 @@ const emit = defineEmits([
       />
       <span>网格</span>
     </label>
-    <label class="dtb-row">
+    <label
+      class="dtb-row"
+      title="原点格描边，并标注 (0,0) 与 (1,1)"
+    >
       <input
         type="checkbox"
         :checked="showOrigin"
@@ -31,13 +37,16 @@ const emit = defineEmits([
       />
       <span>原点</span>
     </label>
-    <label class="dtb-row">
+    <label
+      class="dtb-row"
+      title="碰撞体积叠加（有数据时显示）"
+    >
       <input
         type="checkbox"
-        :checked="showRefLabels"
-        @change="emit('update:showRefLabels', $event.target.checked)"
+        :checked="showCollisionVolume"
+        @change="emit('update:showCollisionVolume', $event.target.checked)"
       />
-      <span>参考</span>
+      <span>碰撞体积</span>
     </label>
   </div>
 </template>
