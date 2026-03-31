@@ -21,12 +21,13 @@ defineProps({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 26px;
-  padding: 2px 12px;
+  min-height: 22px;
+  padding: 2px 10px;
   font-size: 12px;
   color: var(--win-text-secondary);
   background: var(--win-chrome);
-  border-top: 1px solid var(--win-border);
+  border-top: 1px solid var(--win-status-inset-bottom);
+  box-shadow: inset 0 1px 0 var(--win-status-inset-top);
 }
 .status-left {
   overflow: hidden;

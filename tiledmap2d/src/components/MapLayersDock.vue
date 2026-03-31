@@ -141,8 +141,8 @@ function kindLabel(layer) {
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 1px solid var(--win-border);
-  border-radius: 4px;
+  border: 1px solid var(--win-btn-border);
+  border-radius: var(--win-radius-btn);
   background: var(--win-surface);
   color: var(--win-text-secondary);
   font-size: 14px;

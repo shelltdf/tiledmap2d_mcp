@@ -9,7 +9,7 @@
 | 地图设置对话框（新建/编辑） | `tiledmap2d/src/components/MapSettingsDialog.vue` |
 | 画布内工具栏 | `tiledmap2d/src/components/CanvasToolsBar.vue` |
 | **显示** 面板（复选框） | `tiledmap2d/src/components/CanvasDisplayPanel.vue` |
-| **缘条折叠按钮** | `tiledmap2d/src/components/DockEdgeButton.vue` |
+| **缘条折叠按钮** | `tiledmap2d/src/components/DockEdgeButton.vue`（`placement`：`left`/`right` 竖排不占满高度，`top`/`bottom` 横排不占满宽度） |
 | **块库 Dock** | `tiledmap2d/src/components/TilePalette.vue` |
 | **块定义 Dock** | `tiledmap2d/src/components/BlockDefinitionDock.vue` |
 | 主工具栏（新建/地图设置/导入导出） | `tiledmap2d/src/components/WinToolbar.vue` |

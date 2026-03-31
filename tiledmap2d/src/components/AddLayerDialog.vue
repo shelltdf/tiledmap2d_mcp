@@ -94,19 +94,20 @@ function onCancel() {
   max-height: min(80vh, 520px);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--win-shadow-dialog);
 }
 .dlg-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--win-border);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--win-border-strong);
+  background: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
 }
 .dlg-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 .dlg-body {
@@ -115,10 +116,11 @@ function onCancel() {
   font-size: 13px;
 }
 .dlg-foot {
-  padding: 10px 14px 14px;
-  border-top: 1px solid var(--win-border);
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--win-border-strong);
   display: flex;
   justify-content: flex-end;
+  background: var(--win-chrome);
 }
 .field {
   margin-bottom: 14px;
@@ -131,10 +133,10 @@ function onCancel() {
 }
 .sel {
   width: 100%;
-  padding: 6px 8px;
+  padding: 4px 8px;
   font: inherit;
-  border: 1px solid var(--win-border);
-  border-radius: 4px;
+  border: 1px solid var(--win-border-strong);
+  border-radius: var(--win-radius-btn);
   background: var(--win-surface);
   color: var(--win-text);
 }

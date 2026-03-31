@@ -1,17 +1,32 @@
-/* Windows 11 浅色风格近似 */
+/* Windows 10/11 桌面风格近似：灰壳、按钮面、菜单高亮、面板描边 */
 :root {
-  --win-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --win-bg: #f3f3f3;
-  --win-chrome: #f3f3f3;
+  --win-font: 'Segoe UI', 'Segoe UI Variable', system-ui, -apple-system, sans-serif;
+  --win-bg: #f0f0f0;
+  --win-chrome: #f0f0f0;
   --win-surface: #ffffff;
-  --win-border: #e5e5e5;
-  --win-text: #1a1a1a;
-  --win-text-secondary: #5c5c5c;
-  --win-accent: #0067c0;
-  --win-accent-hover: #005a9e;
-  --win-hover: #f0f0f0;
-  --win-list-active: #e5f3ff;
-  --win-canvas-bg: #ececec;
+  --win-border: #d0d0d0;
+  --win-border-strong: #a0a0a0;
+  --win-text: #1c1c1c;
+  --win-text-secondary: #5a5a5a;
+  --win-accent: #0078d4;
+  --win-accent-hover: #106ebe;
+  --win-accent-pressed: #005a9e;
+  --win-hover: #e5f3ff;
+  --win-list-active: #cce8ff;
+  --win-canvas-bg: #c8c8c8;
+  --win-radius-panel: 2px;
+  --win-radius-btn: 2px;
+  --win-shadow-panel: 1px 1px 0 rgba(255, 255, 255, 0.75) inset, 0 1px 2px rgba(0, 0, 0, 0.08);
+  --win-shadow-dialog: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  --win-btn-face-top: #ffffff;
+  --win-btn-face-bottom: #e1e1e1;
+  --win-btn-border: #adadad;
+  --win-btn-hover-top: #f5f5f5;
+  --win-btn-hover-bottom: #dcdcdc;
+  --win-menu-hover-bg: #0078d4;
+  --win-menu-hover-fg: #ffffff;
+  --win-status-inset-top: #ffffff;
+  --win-status-inset-bottom: #a0a0a0;
 }
 
 * {
@@ -27,53 +42,106 @@ body,
 
 body {
   font-family: var(--win-font);
+  font-size: 12px;
   background: var(--win-bg);
   color: var(--win-text);
   -webkit-font-smoothing: antialiased;
 }
 
+/* 面板：类 Win32 对话框/组框 */
 .win-panel {
   background: var(--win-surface);
-  border: 1px solid var(--win-border);
-  border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--win-border-strong);
+  border-radius: var(--win-radius-panel);
+  box-shadow: var(--win-shadow-panel);
 }
 
+/* 与菜单栏衔接的工具栏条：无圆角、无侧边框 */
+.win-chrome-strip {
+  background: var(--win-chrome);
+  border: none;
+  border-bottom: 1px solid var(--win-border-strong);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 标准按钮：浅色渐变 + 灰描边（类似经典 Windows 命令按钮） */
 .win-btn {
-  padding: 5px 12px;
+  padding: 3px 12px 3px;
+  min-height: 23px;
   font: inherit;
   font-size: 12px;
-  border: 1px solid var(--win-border);
-  border-radius: 4px;
-  background: var(--win-surface);
+  line-height: 1.25;
+  border: 1px solid var(--win-btn-border);
+  border-radius: var(--win-radius-btn);
+  background: linear-gradient(
+    180deg,
+    var(--win-btn-face-top) 0%,
+    var(--win-btn-face-bottom) 100%
+  );
   color: var(--win-text);
   cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
 }
+
 .win-btn:hover {
-  background: var(--win-hover);
+  background: linear-gradient(
+    180deg,
+    var(--win-btn-hover-top) 0%,
+    var(--win-btn-hover-bottom) 100%
+  );
+  border-color: #a0a0a0;
 }
+
 .win-btn:active {
-  background: #e0e0e0;
+  background: linear-gradient(180deg, #d0d0d0 0%, #e6e6e6 100%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
 }
+
+.win-btn:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
+}
+
 .win-btn.primary {
-  background: var(--win-accent);
-  border-color: var(--win-accent);
+  background: linear-gradient(
+    180deg,
+    var(--win-accent) 0%,
+    var(--win-accent-pressed) 100%
+  );
+  border-color: var(--win-accent-pressed);
   color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset;
 }
+
 .win-btn.primary:hover {
-  background: var(--win-accent-hover);
-  border-color: var(--win-accent-hover);
+  background: linear-gradient(
+    180deg,
+    var(--win-accent-hover) 0%,
+    var(--win-accent) 100%
+  );
+  border-color: var(--win-accent);
+}
+
+.win-btn.primary:active {
+  background: linear-gradient(
+    180deg,
+    var(--win-accent-pressed) 0%,
+    var(--win-accent-hover) 100%
+  );
 }
 
 .win-scrollbar::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
+
 .win-scrollbar::-webkit-scrollbar-thumb {
-  background: #c4c4c4;
-  border-radius: 5px;
+  background: #c1c1c1;
+  border-radius: 0;
   border: 2px solid var(--win-canvas-bg);
 }
+
 .win-scrollbar::-webkit-scrollbar-track {
   background: var(--win-canvas-bg);
 }

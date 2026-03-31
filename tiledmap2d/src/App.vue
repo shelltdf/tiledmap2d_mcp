@@ -39,7 +39,7 @@ const rightDockEdgeActive = computed(
 
 const statusMessage = computed(() => {
   if (tm.lastError) return tm.lastError
-  return '就绪 — 左键绘制，右键擦除；中键拖动画布平移；块库中键选块；滚轮缩放以指针为中心；画布聚焦时按住空格临时选择、松开恢复；方向键平移视口；支持 JSON / TMX（Tiled）'
+  return '就绪 — 左键绘制，右键擦除；中键拖动画布平移；选择工具下中键点按拾取格中块、拖动仍平移；块库中键选块；滚轮缩放以指针为中心；画布聚焦时按住空格临时选择、松开恢复；方向键平移视口；支持 JSON / TMX（Tiled）'
 })
 
 const cursorText = computed(() => {
@@ -325,6 +325,7 @@ function onMenuShowFormats() {
         >
           <DockEdgeButton
             v-if="dockMapLayersCollapsed"
+            placement="left"
             label="地图层"
             @expand="dockMapLayersCollapsed = false"
           />
@@ -405,11 +406,13 @@ function onMenuShowFormats() {
         >
           <DockEdgeButton
             v-if="dockPaletteCollapsed"
+            placement="right"
             label="块库"
             @expand="dockPaletteCollapsed = false"
           />
           <DockEdgeButton
             v-if="dockBlockDefCollapsed"
+            placement="right"
             label="块定义"
             @expand="dockBlockDefCollapsed = false"
           />
@@ -439,20 +442,24 @@ function onMenuShowFormats() {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-  background: var(--win-chrome);
-  border-bottom: 1px solid var(--win-border);
+  padding: 8px 12px 9px;
+  background: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
+  border-bottom: 1px solid var(--win-border-strong);
   user-select: none;
+  flex-shrink: 0;
 }
 .caption-icon {
   width: 20px;
   height: 20px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, var(--win-accent), #5a9fd4);
+  border-radius: 1px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: linear-gradient(180deg, #1a8cff 0%, var(--win-accent) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
 }
 .caption-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 .caption-sub {
   font-size: 12px;
@@ -491,6 +498,8 @@ function onMenuShowFormats() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
   gap: 6px;
   flex-shrink: 0;
   transition:

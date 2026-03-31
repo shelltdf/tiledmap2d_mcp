@@ -88,20 +88,21 @@ const emit = defineEmits(['close'])
   max-height: min(80vh, 640px);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--win-shadow-dialog);
 }
 .dlg-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--win-border);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--win-border-strong);
+  background: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
   flex-shrink: 0;
 }
 .dlg-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 .dlg-body {
@@ -140,15 +141,16 @@ const emit = defineEmits(['close'])
 code {
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   font-size: 12px;
-  background: var(--win-hover);
+  background: #e8e8e8;
   padding: 0 4px;
-  border-radius: 3px;
+  border-radius: 2px;
+  border: 1px solid var(--win-border);
 }
 .fmt-note {
   margin: 0;
   font-size: 12px;
   color: var(--win-text-secondary);
-  border-top: 1px solid var(--win-border);
+  border-top: 1px solid var(--win-border-strong);
   padding-top: 12px;
 }
 .dlg-close {

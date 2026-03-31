@@ -11,7 +11,7 @@ const emit = defineEmits([
 </script>
 
 <template>
-  <div class="toolbar win-panel">
+  <div class="toolbar win-chrome-strip">
     <div class="tb-group">
       <button type="button" class="win-btn" @click="emit('open-new-map')">
         新建地图…
@@ -69,8 +69,7 @@ const emit = defineEmits([
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 12px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--win-border);
+  padding: 6px 10px 7px;
 }
 .tb-group {
   display: flex;
@@ -80,7 +79,7 @@ const emit = defineEmits([
 .tb-sep {
   width: 1px;
   height: 24px;
-  background: var(--win-border);
+  background: var(--win-border-strong);
   margin: 0 4px;
 }
 .file-label {

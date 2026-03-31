@@ -3,7 +3,7 @@ defineProps({
   activeTool: { type: String, required: true },
 })
 
-const emit = defineEmits(['select', 'fit-view', 'center-view'])
+const emit = defineEmits(['select', 'fit-view', 'actual-size'])
 
 const tools = [
   { id: 'select', label: '选择', title: '选择工具' },
@@ -97,18 +97,18 @@ function choose(id) {
     <button
       type="button"
       class="ctb-btn"
-      title="居中"
-      aria-label="居中"
-      @click="emit('center-view')"
+      title="1:1（100% 缩放，以视口中心为锚）"
+      aria-label="1:1 实际大小，视口中心缩放"
+      @click="emit('actual-size')"
     >
       <span class="ctb-btn-inner">
         <svg class="ctb-ico" viewBox="0 0 24 24" aria-hidden="true">
           <path
             fill="currentColor"
-            d="M12 2v4M12 18v4M2 12h4M18 12h4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"
+            d="M7 7h10v10H7V7zm2 2v6h6V9H9z"
           />
         </svg>
-        <span class="ctb-lbl">居中</span>
+        <span class="ctb-lbl">1:1</span>
       </span>
     </button>
   </div>
@@ -147,25 +147,36 @@ function choose(id) {
 }
 .ctb-btn {
   width: 100%;
-  min-height: 30px;
+  min-height: 28px;
   height: auto;
   padding: 4px 8px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  border: 1px solid var(--win-border);
-  border-radius: 6px;
-  background: var(--win-surface);
+  border: 1px solid var(--win-btn-border);
+  border-radius: var(--win-radius-btn);
+  background: linear-gradient(
+    180deg,
+    var(--win-btn-face-top) 0%,
+    var(--win-btn-face-bottom) 100%
+  );
   color: var(--win-text);
   cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
 }
 .ctb-btn:hover {
-  background: var(--win-hover);
+  background: linear-gradient(
+    180deg,
+    var(--win-btn-hover-top) 0%,
+    var(--win-btn-hover-bottom) 100%
+  );
+  border-color: #a0a0a0;
 }
 .ctb-btn.active {
-  outline: 2px solid var(--win-accent);
+  outline: 1px solid var(--win-accent);
   outline-offset: -1px;
   background: var(--win-list-active);
+  border-color: var(--win-accent);
 }
 .ctb-ico {
   width: 18px;

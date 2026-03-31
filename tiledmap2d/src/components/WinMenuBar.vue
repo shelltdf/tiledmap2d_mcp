@@ -116,10 +116,10 @@ onUnmounted(() => {
 .win-menubar {
   display: flex;
   align-items: stretch;
-  gap: 2px;
-  padding: 2px 8px 4px;
+  gap: 0;
+  padding: 1px 6px 2px;
   background: var(--win-chrome);
-  border-bottom: 1px solid var(--win-border);
+  border-bottom: 1px solid var(--win-border-strong);
   user-select: none;
   flex-shrink: 0;
 }
@@ -130,8 +130,8 @@ onUnmounted(() => {
   font: inherit;
   font-size: 12px;
   padding: 4px 10px;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--win-text);
   cursor: pointer;
@@ -139,6 +139,7 @@ onUnmounted(() => {
 .menu-title:hover,
 .menu-title:focus-visible {
   background: var(--win-hover);
+  border-color: #c0c0c0;
   outline: none;
 }
 .mn {
@@ -149,12 +150,12 @@ onUnmounted(() => {
   top: 100%;
   left: 0;
   min-width: 200px;
-  padding: 4px 0;
-  margin-top: 2px;
+  padding: 2px 0;
+  margin-top: 0;
   background: var(--win-surface);
-  border: 1px solid var(--win-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--win-border-strong);
+  border-radius: 0;
+  box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.2);
   z-index: 50;
 }
 .menu-item {
@@ -163,7 +164,7 @@ onUnmounted(() => {
   text-align: left;
   font: inherit;
   font-size: 12px;
-  padding: 6px 14px;
+  padding: 4px 22px 4px 12px;
   border: none;
   background: transparent;
   color: var(--win-text);
@@ -171,12 +172,14 @@ onUnmounted(() => {
 }
 .menu-item:hover,
 .menu-item:focus-visible {
-  background: var(--win-list-active);
+  background: var(--win-menu-hover-bg);
+  color: var(--win-menu-hover-fg);
   outline: none;
 }
 .menu-sep {
   height: 1px;
-  margin: 4px 8px;
-  background: var(--win-border);
+  margin: 4px 0;
+  border: none;
+  background: var(--win-border-strong);
 }
 </style>

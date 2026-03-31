@@ -34,17 +34,31 @@ const emit = defineEmits([
 ])
 
 const canvasRef = ref(null)
-const padRef = ref(null)
+const innerRef = ref(null)
 const wrapRef = ref(null)
+/** 画布在视口内的平移（px），与缩放无关；不依赖 scroll，可任意方向无限平移 */
+const panX = ref(0)
+const panY = ref(0)
 let painting = false
 let lastPanX = 0
 let lastPanY = 0
+/**
+ * 中键平移状态机（仅 button===1）
+ * - idle：未按中键
+ * - pending：选择工具下已按下，尚未判定是「点选格」还是「拖动画布」
+ * - active：正在用中键拖动平移视图（transform）
+ */
+let middlePanState = 'idle'
 let toolBeforeSpace = null
 let spaceHoldListener = false
+let wrapResizeObserver = null
+
+const MIDDLE_PAN_THRESHOLD_PX = 8
+const MIDDLE_BUTTONS_MASK = 4
 
 const KEY_SCROLL_STEP = 48
-/** 画布四周留白（px），使地图可略平移出视口；过大会让地图在视口内显得「偏一侧」 */
-const VIEW_SCROLL_MARGIN = 64
+/** 适应窗口时，可视区与地图之间的最小边距（px） */
+const VIEW_SCROLL_MARGIN_MIN = 64
 
 function colorForTileId(id) {
   const t = props.tileTypes.find((x) => x.id === id)
@@ -186,18 +200,29 @@ function tileIdAtActiveLayer(cell) {
   return L.tiles?.[cell.gy]?.[cell.gx] ?? 0
 }
 
+function applyMiddlePanDelta(dx, dy) {
+  panX.value += dx
+  panY.value += dy
+}
+
 function onPointerDown(e) {
   wrapRef.value?.focus()
   if (e.button === 1) {
     e.preventDefault()
-    panning.value = true
     lastPanX = e.clientX
     lastPanY = e.clientY
-    padRef.value?.setPointerCapture(e.pointerId)
+    innerRef.value?.setPointerCapture(e.pointerId)
+    if (props.activeTool === 'select') {
+      middlePanState = 'pending'
+      panning.value = false
+    } else {
+      middlePanState = 'active'
+      panning.value = true
+    }
     return
   }
   e.preventDefault()
-  padRef.value?.setPointerCapture(e.pointerId)
+  innerRef.value?.setPointerCapture(e.pointerId)
   const cell = eventToCell(e)
   emit('cursor', cell)
   if (props.activeTool === 'select') {
@@ -226,18 +251,25 @@ function onPointerDown(e) {
 }
 
 function onPointerMove(e) {
-  if (panning.value) {
+  if (middlePanState !== 'idle' && (e.buttons & MIDDLE_BUTTONS_MASK)) {
     e.preventDefault()
     const dx = e.clientX - lastPanX
     const dy = e.clientY - lastPanY
-    lastPanX = e.clientX
-    lastPanY = e.clientY
-    const el = wrapRef.value
-    if (el) {
-      el.scrollLeft -= dx
-      el.scrollTop -= dy
+    if (middlePanState === 'pending') {
+      if (Math.hypot(dx, dy) <= MIDDLE_PAN_THRESHOLD_PX) return
+      middlePanState = 'active'
+      panning.value = true
+      applyMiddlePanDelta(dx, dy)
+      lastPanX = e.clientX
+      lastPanY = e.clientY
+      return
     }
-    return
+    if (middlePanState === 'active') {
+      applyMiddlePanDelta(dx, dy)
+      lastPanX = e.clientX
+      lastPanY = e.clientY
+      return
+    }
   }
   const cell = eventToCell(e)
   emit('cursor', cell)
@@ -251,11 +283,33 @@ function onPointerMove(e) {
 }
 
 function onPointerUp(e) {
-  panning.value = false
+  if (e.button === 1) {
+    e.preventDefault()
+    if (middlePanState === 'pending' && props.activeTool === 'select') {
+      const cell = eventToCell(e)
+      if (cell) {
+        emit('pick-tile', {
+          gx: cell.gx,
+          gy: cell.gy,
+          tileId: tileIdAtActiveLayer(cell),
+        })
+      }
+    }
+    middlePanState = 'idle'
+    panning.value = false
+    try {
+      if (e?.pointerId != null) {
+        innerRef.value?.releasePointerCapture(e.pointerId)
+      }
+    } catch {
+      /* noop */
+    }
+    return
+  }
   painting = false
   try {
     if (e?.pointerId != null) {
-      padRef.value?.releasePointerCapture(e.pointerId)
+      innerRef.value?.releasePointerCapture(e.pointerId)
     }
   } catch {
     /* noop */
@@ -264,28 +318,48 @@ function onPointerUp(e) {
 
 /** 中键平移时指针可能移出画布矩形，不要用 leave 结束拖拽（否则像无法自由平移） */
 function onPointerLeave(e) {
-  if (panning.value) return
+  if (middlePanState === 'active' || middlePanState === 'pending') return
   onPointerUp(e)
+}
+
+function onPointerCancel(e) {
+  middlePanState = 'idle'
+  panning.value = false
+  painting = false
+  try {
+    if (e?.pointerId != null) {
+      innerRef.value?.releasePointerCapture(e.pointerId)
+    }
+  } catch {
+    /* noop */
+  }
 }
 
 function onWheel(e) {
   e.preventDefault()
-  const rect = wrapRef.value?.getBoundingClientRect()
-  if (!rect) return
-  const x = e.clientX - rect.left
-  const y = e.clientY - rect.top
+  const canvas = canvasRef.value
+  const wrap = wrapRef.value
+  if (!canvas || !wrap) return
   const oldZ = props.zoom
+  const cellOld = props.tileSize * oldZ
+  const cr = canvas.getBoundingClientRect()
+  /** 缩放前指针下点在「格坐标」中的位置（可越界） */
+  const anchorGx = (e.clientX - cr.left) / cellOld
+  const anchorGy = (e.clientY - cr.top) / cellOld
+
   emit('zoom-wheel', e.deltaY)
   nextTick(() => {
     const newZ = props.zoom
     if (newZ === oldZ) return
-    const k = newZ / oldZ
-    const wrap = wrapRef.value
-    if (!wrap) return
-    const cx = wrap.scrollLeft + x
-    const cy = wrap.scrollTop + y
-    wrap.scrollLeft = Math.max(0, cx * k - x)
-    wrap.scrollTop = Math.max(0, cy * k - y)
+    const cellNew = props.tileSize * newZ
+    const wr = wrap.getBoundingClientRect()
+    /**
+     * 直接解算 pan，避免缩放后再读 canvas.getBoundingClientRect 做增量（双 rAF + 布局读数易亚像素抖动）。
+     * 条件：指针下地图点在新格尺寸下仍落在 (e.clientX, e.clientY)；
+     * 画布左上在视口内坐标为 (panX, panY)，故 wr.left + panX + anchorGx*cellNew = e.clientX。
+     */
+    panX.value = e.clientX - wr.left - anchorGx * cellNew
+    panY.value = e.clientY - wr.top - anchorGy * cellNew
   })
 }
 
@@ -301,34 +375,58 @@ function onWindowSpaceUp(e) {
 function fitView() {
   const wrap = wrapRef.value
   if (!wrap) return
-  const pad = VIEW_SCROLL_MARGIN
+  const m = VIEW_SCROLL_MARGIN_MIN
   const tw = props.width
   const th = props.height
   const ts = props.tileSize
   const vw = wrap.clientWidth
   const vh = wrap.clientHeight
   if (vw <= 0 || vh <= 0) return
-  const zx = (vw - 2 * pad) / (tw * ts)
-  const zy = (vh - 2 * pad) / (th * ts)
+  const availW = Math.max(1, vw - 2 * m)
+  const availH = Math.max(1, vh - 2 * m)
+  const zx = availW / (tw * ts)
+  const zy = availH / (th * ts)
   const z = Math.min(zx, zy)
   emit('set-zoom', z)
-  nextTick(() => centerViewport())
+  nextTick(() => {
+    requestAnimationFrame(() => centerViewport())
+  })
 }
 
-function centerViewport() {
+/** 1:1：zoom=1，且以视口中心为锚缩放（中心点下地图格位置不变） */
+function actualSizeView() {
   const wrap = wrapRef.value
   if (!wrap) return
-  const pad = VIEW_SCROLL_MARGIN
-  const cell = props.tileSize * props.zoom
-  const cw = props.width * cell
-  const ch = props.height * cell
-  const contentW = cw + pad * 2
-  const contentH = ch + pad * 2
   const vw = wrap.clientWidth
   const vh = wrap.clientHeight
   if (vw <= 0 || vh <= 0) return
-  wrap.scrollLeft = Math.max(0, (contentW - vw) / 2)
-  wrap.scrollTop = Math.max(0, (contentH - vh) / 2)
+  const oldZ = props.zoom
+  const cellOld = props.tileSize * oldZ
+  const cx = vw / 2 - panX.value
+  const cy = vh / 2 - panY.value
+  const anchorGx = cx / cellOld
+  const anchorGy = cy / cellOld
+
+  emit('set-zoom', 1)
+  nextTick(() => {
+    const cellNew = props.tileSize * props.zoom
+    panX.value = vw / 2 - anchorGx * cellNew
+    panY.value = vh / 2 - anchorGy * cellNew
+  })
+}
+
+/** 将地图几何中心对齐到视口中心（任意缩放下成立） */
+function centerViewport() {
+  const wrap = wrapRef.value
+  if (!wrap) return
+  const cell = props.tileSize * props.zoom
+  const cw = props.width * cell
+  const ch = props.height * cell
+  const vw = wrap.clientWidth
+  const vh = wrap.clientHeight
+  if (vw <= 0 || vh <= 0) return
+  panX.value = (vw - cw) / 2
+  panY.value = (vh - ch) / 2
 }
 
 function scheduleCenter() {
@@ -344,11 +442,10 @@ function cursorForTool() {
   return 'crosshair'
 }
 
-function scrollViewportBy(dx, dy) {
-  const el = wrapRef.value
-  if (!el) return
-  el.scrollLeft += dx
-  el.scrollTop += dy
+/** 与原先 scrollLeft += dx 等价：视口「往内容右侧看」时 pan 减少 */
+function panViewportBy(dx, dy) {
+  panX.value -= dx
+  panY.value -= dy
 }
 
 function onWrapKeyDown(e) {
@@ -375,7 +472,7 @@ function onWrapKeyDown(e) {
   else if (e.key === 'ArrowDown') dy = KEY_SCROLL_STEP
   else return
   e.preventDefault()
-  scrollViewportBy(dx, dy)
+  panViewportBy(dx, dy)
 }
 
 watch(
@@ -404,15 +501,27 @@ watch(
   }
 )
 
+function onWindowResize() {
+  draw()
+}
+
 onMounted(async () => {
   draw()
-  window.addEventListener('resize', draw)
+  window.addEventListener('resize', onWindowResize)
   await nextTick()
+  if (wrapRef.value) {
+    wrapResizeObserver = new ResizeObserver(() => {
+      draw()
+    })
+    wrapResizeObserver.observe(wrapRef.value)
+  }
   scheduleCenter()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', draw)
+  wrapResizeObserver?.disconnect()
+  wrapResizeObserver = null
+  window.removeEventListener('resize', onWindowResize)
   window.removeEventListener('keyup', onWindowSpaceUp, true)
 })
 </script>
@@ -425,22 +534,28 @@ onUnmounted(() => {
       tabindex="0"
       @keydown="onWrapKeyDown"
     >
+      <!-- 平移用 transform（panX/Y），不依赖 scroll，任意缩放下可无界平移；裁剪由 overflow:hidden 完成 -->
       <div
-        ref="padRef"
-        class="canvas-pad"
+        ref="innerRef"
+        class="viewport-inner"
         :class="{ 'is-panning': panning }"
-        :style="{
-          padding: `${VIEW_SCROLL_MARGIN}px`,
-          cursor: cursorForTool(),
-        }"
+        :style="{ cursor: cursorForTool() }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
+        @pointercancel="onPointerCancel"
         @pointerleave="onPointerLeave"
         @contextmenu.prevent
         @wheel="onWheel"
       >
-        <canvas ref="canvasRef" class="tile-canvas" tabindex="-1" />
+        <div
+          class="viewport-pan"
+          :style="{
+            transform: `translate3d(${panX}px, ${panY}px, 0)`,
+          }"
+        >
+          <canvas ref="canvasRef" class="tile-canvas" tabindex="-1" />
+        </div>
       </div>
     </div>
     <!-- 覆盖层不参与滚动：工具栏与「显示」共用一个父节点，左右分列 -->
@@ -451,7 +566,7 @@ onUnmounted(() => {
             :active-tool="activeTool"
             @select="(t) => emit('tool', t)"
             @fit-view="fitView"
-            @center-view="centerViewport"
+            @actual-size="actualSizeView"
           />
         </div>
         <div class="viewport-chrome-spacer" aria-hidden="true" />
@@ -474,21 +589,44 @@ onUnmounted(() => {
 .viewport-shell {
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--win-border);
-  border-radius: 4px;
+  border: 1px solid var(--win-border-strong);
+  border-radius: var(--win-radius-panel);
   background: var(--win-canvas-bg);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35);
   /* 滚动在 viewport-scroll 内完成，避免画布像素变高时把外壳撑出主窗口 */
   overflow: hidden;
+  isolation: isolate;
 }
 .viewport-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow: hidden;
   outline: none;
-  /* 不要用 text-align:center + inline-block 居中：部分环境下纵向 scrollHeight 异常，只能横向拖动画布 */
+  overscroll-behavior: contain;
+  contain: paint;
+  position: relative;
+  display: block;
+}
+.viewport-inner {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+.viewport-pan {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.viewport-inner.is-panning {
+  cursor: grabbing !important;
 }
 .viewport-scroll:focus-visible {
   outline: 2px solid var(--win-accent);
@@ -534,20 +672,9 @@ onUnmounted(() => {
 .viewport-chrome-right {
   max-width: min(168px, calc(100% - 20px));
 }
-.canvas-pad {
-  display: block;
-  width: max-content;
-  max-width: none;
-  margin-left: auto;
-  margin-right: auto;
-  box-sizing: content-box;
-}
 .tile-canvas {
   display: block;
   vertical-align: top;
   touch-action: none;
-}
-.canvas-pad.is-panning {
-  cursor: grabbing !important;
 }
 </style>

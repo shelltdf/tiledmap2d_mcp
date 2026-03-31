@@ -19,7 +19,7 @@
 ## 视口与画布内 UI
 
 - **缩放**：滚轮改变 `zoom`，限制在 `minZoom`～`maxZoom`，以指针为锚点调整滚动位置。
-- **平移**：`viewport-scroll` 上 `overflow: auto`；**中键拖拽**更新 `scrollLeft`/`scrollTop`（事件在 **canvas-pad** 上捕获，含留白）；画布聚焦时 **方向键** 步进滚动。
+- **平移**：`viewport-scroll` 上 `overflow: auto`；**中键拖拽**更新 `scrollLeft`/`scrollTop`（指针在 **viewport-inner** 上捕获，含留白）；画布聚焦时 **方向键** 步进滚动。
 - **适应 / 居中**：工具栏按钮调整缩放并滚动至居中。
 - **显示** 面板：复选框控制背景网格、原点标记、参考坐标文字；叠在视口右上，不随画布滚动。
 

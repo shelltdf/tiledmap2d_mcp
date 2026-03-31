@@ -130,19 +130,20 @@ function onCancel() {
   width: min(400px, 100%);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--win-shadow-dialog);
 }
 .dlg-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--win-border);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--win-border-strong);
+  background: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
 }
 .dlg-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 .dlg-body {
@@ -161,9 +162,9 @@ function onCancel() {
   color: var(--win-text-secondary);
 }
 .inp {
-  padding: 6px 8px;
-  border: 1px solid var(--win-border);
-  border-radius: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--win-border-strong);
+  border-radius: var(--win-radius-btn);
   font: inherit;
   background: var(--win-surface);
   color: var(--win-text);
@@ -174,9 +175,10 @@ function onCancel() {
   color: var(--win-text-secondary);
 }
 .dlg-foot {
-  padding: 10px 14px 14px;
-  border-top: 1px solid var(--win-border);
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--win-border-strong);
   display: flex;
   justify-content: flex-end;
+  background: var(--win-chrome);
 }
 </style>
