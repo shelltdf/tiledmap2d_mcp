@@ -53,8 +53,9 @@ function onCancel() {
           <div class="field">
             <div class="label">层类型</div>
             <select v-model="kind" class="sel">
-              <option value="tile">Tiled 瓦片层</option>
-              <option value="image">图片层</option>
+              <option value="tile">Tile</option>
+              <option value="image">Sprite</option>
+              <option value="area">Area</option>
             </select>
           </div>
           <div class="field">
@@ -67,7 +68,7 @@ function onCancel() {
             </div>
           </div>
           <p class="hint">
-            绘制与拾取仅作用于 <strong>Tiled 瓦片层</strong>；图片层为占位叠色（后续可接贴图）。
+            绘制与拾取仅作用于 <strong>Tile</strong> 与 <strong>Area</strong> 层；<strong>Sprite</strong> 层为占位叠色（精灵层，后续可接贴图）。
           </p>
         </div>
         <div class="dlg-foot">

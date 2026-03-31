@@ -3,12 +3,72 @@ import { averageColorFromDataUrl } from '../utils/tileImage.js'
 
 /** 默认块库（新建地图时的初始 palette） */
 export const DEFAULT_TILE_TYPES = [
-  { id: 0, name: '空', color: null, imageDataUrl: null },
-  { id: 1, name: '草地', color: '#6ebf4a', imageDataUrl: null },
-  { id: 2, name: '水', color: '#3b8fd9', imageDataUrl: null },
-  { id: 3, name: '沙地', color: '#d4c4a8', imageDataUrl: null },
-  { id: 4, name: '石砖', color: '#8a8a8a', imageDataUrl: null },
-  { id: 5, name: '木', color: '#a67c52', imageDataUrl: null },
+  {
+    id: 0,
+    name: '空',
+    color: null,
+    imageDataUrl: null,
+    collisionType: 'none',
+    transparentColor: null,
+    textureWidth: null,
+    textureHeight: null,
+    colorDepthMode: 'rgba8',
+  },
+  {
+    id: 1,
+    name: '草地',
+    color: '#6ebf4a',
+    imageDataUrl: null,
+    collisionType: 'none',
+    transparentColor: null,
+    textureWidth: null,
+    textureHeight: null,
+    colorDepthMode: 'rgba8',
+  },
+  {
+    id: 2,
+    name: '水',
+    color: '#3b8fd9',
+    imageDataUrl: null,
+    collisionType: 'none',
+    transparentColor: null,
+    textureWidth: null,
+    textureHeight: null,
+    colorDepthMode: 'rgba8',
+  },
+  {
+    id: 3,
+    name: '沙地',
+    color: '#d4c4a8',
+    imageDataUrl: null,
+    collisionType: 'none',
+    transparentColor: null,
+    textureWidth: null,
+    textureHeight: null,
+    colorDepthMode: 'rgba8',
+  },
+  {
+    id: 4,
+    name: '石砖',
+    color: '#8a8a8a',
+    imageDataUrl: null,
+    collisionType: 'none',
+    transparentColor: null,
+    textureWidth: null,
+    textureHeight: null,
+    colorDepthMode: 'rgba8',
+  },
+  {
+    id: 5,
+    name: '木',
+    color: '#a67c52',
+    imageDataUrl: null,
+    collisionType: 'none',
+    transparentColor: null,
+    textureWidth: null,
+    textureHeight: null,
+    colorDepthMode: 'rgba8',
+  },
 ]
 
 function cloneTileTypes(source = DEFAULT_TILE_TYPES) {
@@ -17,6 +77,23 @@ function cloneTileTypes(source = DEFAULT_TILE_TYPES) {
     name: t.name,
     color: t.color,
     imageDataUrl: t.imageDataUrl ?? null,
+    collisionType: t.collisionType === 'block' ? 'block' : 'none',
+    transparentColor:
+      t.transparentColor != null &&
+      t.transparentColor !== '' &&
+      /^#[0-9a-fA-F]{6}$/.test(String(t.transparentColor).trim())
+        ? String(t.transparentColor).trim().toUpperCase()
+        : null,
+    textureWidth:
+      t.textureWidth != null && Number.isFinite(Number(t.textureWidth))
+        ? Math.max(8, Math.min(128, Math.floor(Number(t.textureWidth))))
+        : null,
+    textureHeight:
+      t.textureHeight != null && Number.isFinite(Number(t.textureHeight))
+        ? Math.max(8, Math.min(128, Math.floor(Number(t.textureHeight))))
+        : null,
+    colorDepthMode:
+      t.colorDepthMode === 'indexed8' ? 'indexed8' : 'rgba8',
   }))
 }
 
@@ -71,6 +148,7 @@ function validateTilesGrid(rows, tw, th, maxTileTypeCount) {
 
 function normalizeLayerKind(k) {
   if (k === 'image') return 'image'
+  if (k === 'area') return 'area'
   return 'tile'
 }
 
@@ -203,7 +281,9 @@ export function useTileMap() {
 
   function activeLayerIsTile() {
     const L = layers.value[activeLayerIndex.value]
-    return L && (L.kind || 'tile') === 'tile'
+    if (!L) return false
+    const k = L.kind || 'tile'
+    return k === 'tile' || k === 'area'
   }
 
   function setTile(gx, gy, id) {
@@ -233,7 +313,7 @@ export function useTileMap() {
   }
 
   /**
-   * @param {{ kind?: 'tile'|'image', insert: 'above'|'below'|'top'|'bottom' }} options
+   * @param {{ kind?: 'tile'|'image'|'area', insert: 'above'|'below'|'top'|'bottom' }} options
    */
   function insertLayer(options) {
     const kind = normalizeLayerKind(options?.kind)
@@ -242,7 +322,12 @@ export function useTileMap() {
     const h = height.value
     const list = layers.value.slice()
     const n = list.length + 1
-    const name = kind === 'image' ? `图片 ${n}` : `图层 ${n}`
+    const name =
+      kind === 'image'
+        ? `Sprite ${n}`
+        : kind === 'area'
+          ? `Area ${n}`
+          : `Tile ${n}`
     const layer = createLayer(name, w, h, kind)
     const ai = activeLayerIndex.value
     let insertAt = 0
@@ -318,6 +403,11 @@ export function useTileMap() {
         name: t.name,
         color: t.color,
         imageDataUrl: t.imageDataUrl ?? null,
+        collisionType: t.collisionType === 'block' ? 'block' : 'none',
+        transparentColor: t.transparentColor ?? null,
+        textureWidth: t.textureWidth ?? null,
+        textureHeight: t.textureHeight ?? null,
+        colorDepthMode: t.colorDepthMode === 'indexed8' ? 'indexed8' : 'rgba8',
       })),
       layers: layers.value.map((L) => ({
         name: L.name,
@@ -388,7 +478,48 @@ export function useTileMap() {
           return `第 ${i} 项 imageDataUrl 须为 data:image/*`
         }
       }
-      next.push({ id: i, name, color, imageDataUrl })
+      const collisionType = raw.collisionType === 'block' ? 'block' : 'none'
+      let transparentColor = null
+      if (
+        i !== 0 &&
+        raw.transparentColor != null &&
+        raw.transparentColor !== ''
+      ) {
+        const tc = String(raw.transparentColor).trim()
+        if (!/^#[0-9a-fA-F]{6}$/.test(tc)) {
+          return `第 ${i} 项 transparentColor 须为 #RRGGBB 或留空`
+        }
+        transparentColor = tc.toUpperCase()
+      }
+      let textureWidth = null
+      let textureHeight = null
+      if (raw.textureWidth != null && raw.textureWidth !== '') {
+        const tw = Math.floor(Number(raw.textureWidth))
+        if (!Number.isFinite(tw) || tw < 8 || tw > 128) {
+          return `第 ${i} 项 textureWidth 须在 8～128`
+        }
+        textureWidth = tw
+      }
+      if (raw.textureHeight != null && raw.textureHeight !== '') {
+        const th = Math.floor(Number(raw.textureHeight))
+        if (!Number.isFinite(th) || th < 8 || th > 128) {
+          return `第 ${i} 项 textureHeight 须在 8～128`
+        }
+        textureHeight = th
+      }
+      const colorDepthMode =
+        raw.colorDepthMode === 'indexed8' ? 'indexed8' : 'rgba8'
+      next.push({
+        id: i,
+        name,
+        color,
+        imageDataUrl,
+        collisionType,
+        transparentColor,
+        textureWidth,
+        textureHeight,
+        colorDepthMode,
+      })
     }
     tileTypes.value = next
     remapTilesToPaletteLength(next.length)
@@ -514,7 +645,17 @@ export function useTileMap() {
     const id = tileTypes.value.length
     tileTypes.value = [
       ...tileTypes.value,
-      { id, name: baseName, color, imageDataUrl: dataUrl },
+      {
+        id,
+        name: baseName,
+        color,
+        imageDataUrl: dataUrl,
+        collisionType: 'none',
+        transparentColor: null,
+        textureWidth: null,
+        textureHeight: null,
+        colorDepthMode: 'rgba8',
+      },
     ]
     selectedTileId.value = id
     clearError()
@@ -523,7 +664,16 @@ export function useTileMap() {
 
   /**
    * @param {number} id
-   * @param {{ name?: string, color?: string | null, imageDataUrl?: string | null }} patch
+   * @param {{
+   *   name?: string,
+   *   color?: string | null,
+   *   imageDataUrl?: string | null,
+   *   collisionType?: 'none' | 'block',
+   *   transparentColor?: string | null,
+   *   textureWidth?: number | null,
+   *   textureHeight?: number | null,
+   *   colorDepthMode?: 'rgba8' | 'indexed8',
+   * }} patch
    */
   function updateTileType(id, patch) {
     if (id < 0 || id >= tileTypes.value.length) return '无效的块 id'
@@ -532,6 +682,17 @@ export function useTileMap() {
     if (!name) return '名称不能为空'
     let color = t.color
     let imageDataUrl = t.imageDataUrl ?? null
+    let collisionType = t.collisionType === 'block' ? 'block' : 'none'
+    let transparentColor = t.transparentColor ?? null
+    let textureWidth =
+      t.textureWidth != null && Number.isFinite(t.textureWidth)
+        ? t.textureWidth
+        : null
+    let textureHeight =
+      t.textureHeight != null && Number.isFinite(t.textureHeight)
+        ? t.textureHeight
+        : null
+    let colorDepthMode = t.colorDepthMode === 'indexed8' ? 'indexed8' : 'rgba8'
     if (id === 0) {
       color = null
       imageDataUrl = null
@@ -553,9 +714,63 @@ export function useTileMap() {
           imageDataUrl = u
         }
       }
+      if (patch.collisionType !== undefined) {
+        const c = patch.collisionType
+        if (c !== 'none' && c !== 'block') return 'collisionType 须为 none 或 block'
+        collisionType = c
+      }
+      if (patch.transparentColor !== undefined) {
+        if (patch.transparentColor === null || patch.transparentColor === '') {
+          transparentColor = null
+        } else {
+          const tc = String(patch.transparentColor).trim()
+          if (!/^#[0-9a-fA-F]{6}$/.test(tc)) return 'transparentColor 须为 #RRGGBB'
+          transparentColor = tc.toUpperCase()
+        }
+      }
+      if (patch.textureWidth !== undefined) {
+        if (patch.textureWidth === null || patch.textureWidth === '') {
+          textureWidth = null
+        } else {
+          const tw = Math.floor(Number(patch.textureWidth))
+          if (!Number.isFinite(tw) || tw < 8 || tw > 128) {
+            return 'textureWidth 须在 8～128 或留空'
+          }
+          textureWidth = tw
+        }
+      }
+      if (patch.textureHeight !== undefined) {
+        if (patch.textureHeight === null || patch.textureHeight === '') {
+          textureHeight = null
+        } else {
+          const th = Math.floor(Number(patch.textureHeight))
+          if (!Number.isFinite(th) || th < 8 || th > 128) {
+            return 'textureHeight 须在 8～128 或留空'
+          }
+          textureHeight = th
+        }
+      }
+      if (patch.colorDepthMode !== undefined) {
+        const m = patch.colorDepthMode
+        if (m !== 'rgba8' && m !== 'indexed8') {
+          return 'colorDepthMode 须为 rgba8 或 indexed8'
+        }
+        colorDepthMode = m
+      }
     }
     const next = tileTypes.value.slice()
-    next[id] = { ...t, id, name, color, imageDataUrl }
+    next[id] = {
+      ...t,
+      id,
+      name,
+      color,
+      imageDataUrl,
+      collisionType,
+      transparentColor,
+      textureWidth,
+      textureHeight,
+      colorDepthMode,
+    }
     tileTypes.value = next
     clearError()
     return null

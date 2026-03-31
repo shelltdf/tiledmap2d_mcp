@@ -26,7 +26,7 @@ const pixelEditorOpen = ref(false)
 const editingTileTypeId = ref(0)
 const showGridOverlay = ref(true)
 const showOriginMarker = ref(false)
-const showCollisionVolume = ref(false)
+const showCollisionVolume = ref(true)
 const importJsonEl = ref(null)
 const importTmxEl = ref(null)
 
@@ -115,17 +115,27 @@ function onEditTileType() {
   pixelEditorOpen.value = true
 }
 
-async function onPixelEditorSave(dataUrl) {
+async function onPixelEditorSave(payload) {
   const id = editingTileTypeId.value
+  if (!payload || id === 0) return
   const t = tm.tileTypes[id]
-  if (!t || id === 0) return
+  if (!t) return
   let color
   try {
-    color = await averageColorFromDataUrl(dataUrl)
+    color = await averageColorFromDataUrl(payload.imageDataUrl)
   } catch {
     color = t.color ?? '#888888'
   }
-  const err = tm.updateTileType(id, { imageDataUrl: dataUrl, color })
+  const err = tm.updateTileType(id, {
+    imageDataUrl: payload.imageDataUrl,
+    color,
+    name: payload.name,
+    collisionType: payload.collisionType,
+    transparentColor: payload.transparentColor,
+    textureWidth: payload.textureWidth,
+    textureHeight: payload.textureHeight,
+    colorDepthMode: payload.colorDepthMode,
+  })
   if (err) tm.setError(err)
 }
 
@@ -340,12 +350,9 @@ function onMenuShowFormats() {
 
     <PixelEditorDialog
       :open="pixelEditorOpen"
-      :tile-size="tm.tileSize"
-      :initial-data-url="
-        tm.tileTypes[editingTileTypeId]?.imageDataUrl ?? null
-      "
+      :map-tile-size="tm.tileSize"
+      :tile-type="tm.tileTypes[editingTileTypeId] ?? null"
       :fallback-color="tm.tileTypes[editingTileTypeId]?.color ?? '#888888'"
-      :type-name="tm.tileTypes[editingTileTypeId]?.name ?? ''"
       @close="pixelEditorOpen = false"
       @save="onPixelEditorSave"
     />

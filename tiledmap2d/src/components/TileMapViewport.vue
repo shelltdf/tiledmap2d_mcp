@@ -20,8 +20,8 @@ const props = defineProps({
   showGridOverlay: { type: Boolean, default: true },
   /** 原点格描边 + (0,0) 与 (1,1) 坐标文字 */
   showOriginMarker: { type: Boolean, default: false },
-  /** 碰撞体积叠加（有数据时再绘制） */
-  showCollisionVolume: { type: Boolean, default: false },
+  /** 为 true 时在碰撞为「阻断」的格子上绘制碰撞体积叠加 */
+  showCollisionVolume: { type: Boolean, default: true },
 })
 
 const emit = defineEmits([
@@ -65,22 +65,72 @@ function colorForTileId(id) {
   return t?.color ?? '#ccc'
 }
 
+/** 块类型为「阻断」时参与碰撞体积显示 */
+function tileTypeBlocksCollision(tid) {
+  if (tid == null || tid === 0) return false
+  const t = props.tileTypes[tid]
+  return t?.collisionType === 'block'
+}
+
+/** 任一可见瓦片层在 (gx,gy) 上放置了带碰撞的块 */
+function cellHasBlockingCollision(gx, gy) {
+  for (const layer of props.layers) {
+    if (!layer?.visible) continue
+    if (layerKind(layer) !== 'tile' || !layer.tiles) continue
+    const tid = layer.tiles[gy]?.[gx] ?? 0
+    if (tileTypeBlocksCollision(tid)) return true
+  }
+  return false
+}
+
 function layerKind(layer) {
   return layer?.kind === 'image' ? 'image' : 'tile'
+}
+
+/**
+ * 格线对齐：每列/行右边界用 round(i*cell) 累加，相邻格共享整数像素边界，避免浮点 cell 造成块间 1px 缝。
+ */
+function getTileLayout() {
+  const cell = props.tileSize * props.zoom
+  const tw = props.width
+  const th = props.height
+  const xs = []
+  const ys = []
+  for (let i = 0; i <= tw; i++) xs.push(Math.round(i * cell))
+  for (let j = 0; j <= th; j++) ys.push(Math.round(j * cell))
+  return { cell, xs, ys, cw: xs[tw], ch: ys[th] }
+}
+
+/** 每个纹理像素在屏幕上至少占 1 个 CSS 像素时用最近邻；否则用平滑缩小（抗锯齿） */
+function setImageSmoothingForScale(ctx, destW, destH, srcW, srcH) {
+  if (srcW <= 0 || srcH <= 0) {
+    ctx.imageSmoothingEnabled = true
+    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
+    return
+  }
+  const pxPerSrcX = destW / srcW
+  const pxPerSrcY = destH / srcH
+  const pxPerSrc = Math.min(pxPerSrcX, pxPerSrcY)
+  if (pxPerSrc >= 1) {
+    ctx.imageSmoothingEnabled = false
+    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'low'
+  } else {
+    ctx.imageSmoothingEnabled = true
+    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high'
+  }
 }
 
 function draw() {
   const canvas = canvasRef.value
   if (!canvas) return
   const dpr = window.devicePixelRatio || 1
-  const cell = props.tileSize * props.zoom
-  const cw = props.width * cell
-  const ch = props.height * cell
+  const { xs, ys, cw, ch } = getTileLayout()
   canvas.width = Math.max(1, Math.floor(cw * dpr))
   canvas.height = Math.max(1, Math.floor(ch * dpr))
   canvas.style.width = `${cw}px`
   canvas.style.height = `${ch}px`
   const ctx = canvas.getContext('2d')
+  if (!ctx) return
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cw, ch)
 
@@ -89,11 +139,13 @@ function draw() {
   if (props.showGridOverlay) {
     for (let gy = 0; gy < props.height; gy++) {
       for (let gx = 0; gx < props.width; gx++) {
-        const x = gx * cell
-        const y = gy * cell
+        const x = xs[gx]
+        const y = ys[gy]
+        const w = xs[gx + 1] - xs[gx]
+        const h = ys[gy + 1] - ys[gy]
         const odd = (gx + gy) % 2 === 0
         ctx.fillStyle = odd ? light : dark
-        ctx.fillRect(x, y, cell, cell)
+        ctx.fillRect(x, y, w, h)
       }
     }
   }
@@ -111,8 +163,10 @@ function draw() {
       for (let gx = 0; gx < props.width; gx++) {
         const tid = layer.tiles[gy]?.[gx] ?? 0
         if (tid === 0) continue
-        const x = gx * cell
-        const y = gy * cell
+        const x = xs[gx]
+        const y = ys[gy]
+        const w = xs[gx + 1] - xs[gx]
+        const h = ys[gy + 1] - ys[gy]
         const tp = props.tileTypes[tid]
         const url = tp?.imageDataUrl
         if (url) {
@@ -124,34 +178,59 @@ function draw() {
             img.src = url
           }
           if (img.complete && img.naturalWidth > 0) {
-            ctx.drawImage(img, x, y, cell, cell)
+            setImageSmoothingForScale(
+              ctx,
+              w,
+              h,
+              img.naturalWidth,
+              img.naturalHeight,
+            )
+            ctx.drawImage(img, x, y, w, h)
           } else {
             ctx.fillStyle = colorForTileId(tid)
-            ctx.fillRect(x, y, cell, cell)
+            ctx.fillRect(x, y, w, h)
           }
         } else {
           ctx.fillStyle = colorForTileId(tid)
-          ctx.fillRect(x, y, cell, cell)
+          ctx.fillRect(x, y, w, h)
         }
       }
     }
   }
 
+  /* 开启「显示 → 碰撞体积」且块为「阻断」时叠加示意 */
+  if (props.showCollisionVolume) {
+    for (let gy = 0; gy < props.height; gy++) {
+      for (let gx = 0; gx < props.width; gx++) {
+        if (!cellHasBlockingCollision(gx, gy)) continue
+        const x = xs[gx]
+        const y = ys[gy]
+        const w = xs[gx + 1] - xs[gx]
+        const h = ys[gy + 1] - ys[gy]
+        ctx.fillStyle = 'rgba(255, 120, 40, 0.2)'
+        ctx.fillRect(x, y, w, h)
+        ctx.strokeStyle = 'rgba(200, 70, 0, 0.75)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([3, 2])
+        ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1))
+        ctx.setLineDash([])
+      }
+    }
+  }
+
   if (props.showOriginMarker && props.width > 0 && props.height > 0) {
+    const c0w = xs[1] - xs[0]
+    const c0h = ys[1] - ys[0]
     ctx.strokeStyle = '#c42b1c'
     ctx.lineWidth = 2
-    ctx.strokeRect(1.5, 1.5, cell - 3, cell - 3)
-    ctx.font = `${Math.max(10, Math.min(14, cell * 0.35))}px Segoe UI, system-ui, sans-serif`
+    ctx.strokeRect(1.5, 1.5, c0w - 3, c0h - 3)
+    ctx.font = `${Math.max(10, Math.min(14, c0w * 0.35))}px Segoe UI, system-ui, sans-serif`
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.textBaseline = 'top'
     ctx.fillText('(0,0)', 4, 3)
     if (props.width >= 2 && props.height >= 2) {
-      ctx.fillText('(1,1)', cell + 4, cell + 3)
+      ctx.fillText('(1,1)', xs[1] + 4, ys[1] + 3)
     }
-  }
-
-  if (props.showCollisionVolume) {
-    /* 碰撞体积数据接入后在此绘制叠加层 */
   }
 
   const p = props.pickedCell
@@ -164,11 +243,13 @@ function draw() {
       gx < props.width &&
       gy < props.height
     ) {
-      const x = gx * cell
-      const y = gy * cell
+      const x = xs[gx]
+      const y = ys[gy]
+      const w = xs[gx + 1] - xs[gx]
+      const h = ys[gy + 1] - ys[gy]
       ctx.strokeStyle = '#0067c0'
       ctx.lineWidth = 2
-      ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3)
+      ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3)
     }
   }
 }
@@ -177,11 +258,16 @@ function eventToCell(e) {
   const canvas = canvasRef.value
   if (!canvas) return null
   const rect = canvas.getBoundingClientRect()
-  const cell = props.tileSize * props.zoom
-  const x = e.clientX - rect.left
-  const y = e.clientY - rect.top
-  const gx = Math.floor(x / cell)
-  const gy = Math.floor(y / cell)
+  const { xs, ys } = getTileLayout()
+  const px = e.clientX - rect.left
+  const py = e.clientY - rect.top
+  if (px < 0 || py < 0 || px >= xs[props.width] || py >= ys[props.height]) {
+    return null
+  }
+  let gx = 0
+  while (gx < props.width && px >= xs[gx + 1]) gx++
+  let gy = 0
+  while (gy < props.height && py >= ys[gy + 1]) gy++
   if (gx < 0 || gy < 0 || gx >= props.width || gy >= props.height) return null
   return { gx, gy }
 }
@@ -386,9 +472,7 @@ function actualSizeView() {
 function centerViewport() {
   const wrap = wrapRef.value
   if (!wrap) return
-  const cell = props.tileSize * props.zoom
-  const cw = props.width * cell
-  const ch = props.height * cell
+  const { cw, ch } = getTileLayout()
   const vw = wrap.clientWidth
   const vh = wrap.clientHeight
   if (vw <= 0 || vh <= 0) return
@@ -445,6 +529,7 @@ function onWrapKeyDown(e) {
 watch(
   () => [
     props.layers,
+    props.tileTypes,
     props.width,
     props.height,
     props.tileSize,
@@ -544,7 +629,9 @@ onUnmounted(() => {
             :show-collision-volume="showCollisionVolume"
             @update:show-grid="emit('update:showGridOverlay', $event)"
             @update:show-origin="emit('update:showOriginMarker', $event)"
-            @update:show-collision-volume="emit('update:showCollisionVolume', $event)"
+            @update:show-collision-volume="
+              emit('update:showCollisionVolume', $event)
+            "
           />
         </div>
       </div>
@@ -643,5 +730,7 @@ onUnmounted(() => {
   display: block;
   vertical-align: top;
   touch-action: none;
+  /* 插值策略在 draw 内按缩放切换；此处不强制整画布像素化，避免与缩小平滑冲突 */
+  image-rendering: auto;
 }
 </style>

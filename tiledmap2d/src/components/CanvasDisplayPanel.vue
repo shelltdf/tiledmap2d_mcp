@@ -2,7 +2,7 @@
 defineProps({
   showGrid: { type: Boolean, default: true },
   showOrigin: { type: Boolean, default: false },
-  showCollisionVolume: { type: Boolean, default: false },
+  showCollisionVolume: { type: Boolean, default: true },
 })
 
 const emit = defineEmits([
@@ -39,7 +39,7 @@ const emit = defineEmits([
     </label>
     <label
       class="dtb-row"
-      title="碰撞体积叠加（有数据时显示）"
+      title="开启后，在块库中碰撞为「阻断」的格子上叠加显示碰撞体积"
     >
       <input
         type="checkbox"

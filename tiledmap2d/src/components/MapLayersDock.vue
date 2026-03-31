@@ -30,8 +30,19 @@ function onDrop(e, toIndex) {
   emit('reorder', { from, to: toIndex })
 }
 
-function kindLabel(layer) {
-  return (layer?.kind || 'tile') === 'image' ? '图' : '瓦'
+/** 角标：T / S / A */
+function kindBadge(layer) {
+  const k = layer?.kind || 'tile'
+  if (k === 'image') return 'S'
+  if (k === 'area') return 'A'
+  return 'T'
+}
+
+function kindTitle(layer) {
+  const k = layer?.kind || 'tile'
+  if (k === 'image') return 'Sprite'
+  if (k === 'area') return 'Area'
+  return 'Tile'
 }
 </script>
 
@@ -95,10 +106,7 @@ function kindLabel(layer) {
         @drop="onDrop($event, index)"
         @click="emit('select', index)"
       >
-        <span
-          class="kind-badge"
-          :title="kindLabel(layer) === '图' ? '图片层' : '瓦片层'"
-        >{{ kindLabel(layer) }}</span>
+        <span class="kind-badge" :title="kindTitle(layer)">{{ kindBadge(layer) }}</span>
         <span class="layer-name" :title="layer.name">{{ layer.name }}</span>
         <label class="vis-toggle" :title="layer.visible ? '隐藏' : '显示'" @click.stop>
           <input
@@ -200,10 +208,11 @@ function kindLabel(layer) {
   background: var(--win-list-active);
 }
 .kind-badge {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  width: 18px;
+  min-width: 18px;
   height: 18px;
+  padding: 0 3px;
   display: grid;
   place-items: center;
   border-radius: 3px;
