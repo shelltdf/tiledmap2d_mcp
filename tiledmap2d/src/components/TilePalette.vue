@@ -4,7 +4,13 @@ defineProps({
   selectedId: { type: Number, required: true },
 })
 
-const emit = defineEmits(['select', 'import-types', 'edit-type', 'delete-type'])
+const emit = defineEmits([
+  'select',
+  'import-types',
+  'edit-type',
+  'delete-type',
+  'collapse',
+])
 
 /** 中键：不触发左键 click，在此单独选中并避免浏览器默认行为 */
 function onMiddlePointerDown(e, id) {
@@ -28,27 +34,36 @@ function onImportFile(e) {
 </script>
 
 <template>
-  <aside class="palette win-panel">
-    <header class="palette-head">
-      <div class="palette-title">块库</div>
-      <div class="palette-toolbar">
-        <label class="pal-btn">
-          导入
-          <input
-            type="file"
-            class="pal-file"
-            accept="application/json,.json"
-            @change="onImportFile"
-          />
-        </label>
-        <button type="button" class="pal-btn" @click="emit('edit-type')">
-          编辑
-        </button>
-        <button type="button" class="pal-btn" @click="emit('delete-type')">
-          删除
-        </button>
-      </div>
-    </header>
+  <aside class="palette dock--fill win-panel" aria-label="块库">
+    <div class="dock-head">
+      <div class="dock-title">块库</div>
+      <button
+        type="button"
+        class="dock-collapse-btn"
+        title="折叠到右缘"
+        aria-label="折叠块库停靠面板"
+        @click="emit('collapse')"
+      >
+        ⟩
+      </button>
+    </div>
+    <div class="palette-toolbar">
+      <label class="pal-btn">
+        导入
+        <input
+          type="file"
+          class="pal-file"
+          accept="application/json,.json"
+          @change="onImportFile"
+        />
+      </label>
+      <button type="button" class="pal-btn" @click="emit('edit-type')">
+        编辑
+      </button>
+      <button type="button" class="pal-btn" @click="emit('delete-type')">
+        删除
+      </button>
+    </div>
     <div class="palette-grid">
       <button
         v-for="t in types"
@@ -73,22 +88,43 @@ function onImportFile(e) {
 </template>
 
 <style scoped>
-.palette {
+.dock--fill {
   width: 100%;
-  flex-shrink: 0;
-  flex: 1;
+  min-width: 0;
   min-height: 0;
+  flex: 1;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 8px;
   padding: 10px;
 }
-.palette-head {
+.dock-head {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
+}
+.dock-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--win-text-secondary);
+  margin: 0;
+}
+.dock-collapse-btn {
   flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--win-border);
+  border-radius: 4px;
+  background: var(--win-surface);
+  color: var(--win-text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dock-collapse-btn:hover {
+  background: var(--win-hover);
 }
 .palette-toolbar {
   display: flex;
@@ -121,13 +157,6 @@ label.pal-btn {
   cursor: pointer;
   width: 100%;
   height: 100%;
-}
-.palette-title {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--win-text-secondary);
-  line-height: 1.3;
 }
 .palette-grid {
   display: flex;

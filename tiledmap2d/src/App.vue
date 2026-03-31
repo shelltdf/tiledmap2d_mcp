@@ -5,6 +5,7 @@ import { exportTmx, parseTmxToMapPayload } from './utils/tmx.js'
 import WinMenuBar from './components/WinMenuBar.vue'
 import FormatsHelpDialog from './components/FormatsHelpDialog.vue'
 import WinToolbar from './components/WinToolbar.vue'
+import DockEdgeButton from './components/DockEdgeButton.vue'
 import TilePalette from './components/TilePalette.vue'
 import MapLayersDock from './components/MapLayersDock.vue'
 import BlockDefinitionDock from './components/BlockDefinitionDock.vue'
@@ -23,6 +24,18 @@ const showOriginMarker = ref(false)
 const showRefLabels = ref(false)
 const importJsonEl = ref(null)
 const importTmxEl = ref(null)
+
+/** Dock：折叠后按钮在靠边「缘条」，与中间「显示区」兄弟排列；多 Dock 共享显示区高度 */
+const dockMapLayersCollapsed = ref(false)
+const dockPaletteCollapsed = ref(false)
+const dockBlockDefCollapsed = ref(false)
+
+const rightDockDisplayCollapsed = computed(
+  () => dockPaletteCollapsed.value && dockBlockDefCollapsed.value,
+)
+const rightDockEdgeActive = computed(
+  () => dockPaletteCollapsed.value || dockBlockDefCollapsed.value,
+)
 
 const statusMessage = computed(() => {
   if (tm.lastError) return tm.lastError
@@ -303,18 +316,39 @@ function onMenuShowFormats() {
     />
 
     <main class="win-main">
-      <MapLayersDock
-        :layers="tm.layers"
-        :active-index="tm.activeLayerIndex"
-        @select="(i) => tm.setActiveLayer(i)"
-        @toggle-visible="
-          (i, vis) => tm.setLayerVisible(i, vis)
-        "
-        @open-add-dialog="addLayerOpen = true"
-        @rename-active="onLayerRenameActive"
-        @remove-active="onLayerRemoveActive"
-        @reorder="onLayerReorder"
-      />
+      <div class="dock-shelf dock-shelf--left">
+        <div
+          class="dock-edge dock-edge--left"
+          :class="{ 'dock-edge--active': dockMapLayersCollapsed }"
+          role="toolbar"
+          aria-label="左侧折叠停靠"
+        >
+          <DockEdgeButton
+            v-if="dockMapLayersCollapsed"
+            label="地图层"
+            @expand="dockMapLayersCollapsed = false"
+          />
+        </div>
+        <div
+          class="dock-display dock-display--left"
+          :class="{ 'dock-display--collapsed': dockMapLayersCollapsed }"
+        >
+          <MapLayersDock
+            v-show="!dockMapLayersCollapsed"
+            :layers="tm.layers"
+            :active-index="tm.activeLayerIndex"
+            @select="(i) => tm.setActiveLayer(i)"
+            @toggle-visible="
+              (i, vis) => tm.setLayerVisible(i, vis)
+            "
+            @open-add-dialog="addLayerOpen = true"
+            @rename-active="onLayerRenameActive"
+            @remove-active="onLayerRemoveActive"
+            @reorder="onLayerReorder"
+            @collapse="dockMapLayersCollapsed = true"
+          />
+        </div>
+      </div>
       <div class="canvas-workspace">
         <TileMapViewport
           :layers="tm.layers"
@@ -341,19 +375,45 @@ function onMenuShowFormats() {
           @update:show-ref-labels="(v) => (showRefLabels = v)"
         />
       </div>
-      <div class="win-right-docks">
-        <TilePalette
-          :types="tm.tileTypes"
-          :selected-id="tm.selectedTileId"
-          @select="selectTile"
-          @import-types="onImportTileTypes"
-          @edit-type="onEditTileType"
-          @delete-type="onDeleteTileType"
-        />
-        <BlockDefinitionDock
-          :types="tm.tileTypes"
-          :selected-id="tm.selectedTileId"
-        />
+      <div class="dock-shelf dock-shelf--right">
+        <div
+          class="dock-display dock-display--right"
+          :class="{ 'dock-display--collapsed': rightDockDisplayCollapsed }"
+        >
+          <TilePalette
+            v-show="!dockPaletteCollapsed"
+            :types="tm.tileTypes"
+            :selected-id="tm.selectedTileId"
+            @select="selectTile"
+            @import-types="onImportTileTypes"
+            @edit-type="onEditTileType"
+            @delete-type="onDeleteTileType"
+            @collapse="dockPaletteCollapsed = true"
+          />
+          <BlockDefinitionDock
+            v-show="!dockBlockDefCollapsed"
+            :types="tm.tileTypes"
+            :selected-id="tm.selectedTileId"
+            @collapse="dockBlockDefCollapsed = true"
+          />
+        </div>
+        <div
+          class="dock-edge dock-edge--right"
+          :class="{ 'dock-edge--active': rightDockEdgeActive }"
+          role="toolbar"
+          aria-label="右侧折叠停靠"
+        >
+          <DockEdgeButton
+            v-if="dockPaletteCollapsed"
+            label="块库"
+            @expand="dockPaletteCollapsed = false"
+          />
+          <DockEdgeButton
+            v-if="dockBlockDefCollapsed"
+            label="块定义"
+            @expand="dockBlockDefCollapsed = false"
+          />
+        </div>
       </div>
     </main>
 
@@ -416,12 +476,66 @@ function onMenuShowFormats() {
   align-items: stretch;
   overflow: hidden;
 }
-.win-right-docks {
+.dock-shelf--left,
+.dock-shelf--right {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-height: 0;
+}
+.dock-edge--left,
+.dock-edge--right {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  transition:
+    width 0.15s ease,
+    min-width 0.15s ease;
+}
+.dock-edge--left.dock-edge--active,
+.dock-edge--right.dock-edge--active {
+  width: 28px;
+  min-width: 28px;
+}
+.dock-display--left {
+  flex: 0 0 208px;
+  width: 208px;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition:
+    width 0.15s ease,
+    flex 0.15s ease;
+}
+.dock-display--left.dock-display--collapsed {
+  flex: 0 0 0;
+  width: 0;
+  overflow: hidden;
+}
+.dock-display--right {
+  flex: 0 0 188px;
+  width: 188px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  flex-shrink: 0;
-  width: 188px;
-  min-height: 0;
+  transition:
+    width 0.15s ease,
+    flex 0.15s ease;
+}
+.dock-display--right.dock-display--collapsed {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  gap: 0;
 }
 </style>

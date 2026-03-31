@@ -11,6 +11,7 @@ const emit = defineEmits([
   'rename-active',
   'remove-active',
   'reorder',
+  'collapse',
 ])
 
 function onDragStart(e, index) {
@@ -35,8 +36,19 @@ function kindLabel(layer) {
 </script>
 
 <template>
-  <aside class="dock win-panel">
-    <div class="dock-title">地图层</div>
+  <aside class="dock dock--fill win-panel" aria-label="地图层">
+    <div class="dock-head">
+      <div class="dock-title">地图层</div>
+      <button
+        type="button"
+        class="dock-collapse-btn"
+        title="折叠到左缘"
+        aria-label="折叠地图层面板"
+        @click="emit('collapse')"
+      >
+        ⟨
+      </button>
+    </div>
     <div class="dock-actions">
       <button
         type="button"
@@ -64,7 +76,11 @@ function kindLabel(layer) {
         删除
       </button>
     </div>
-    <ul class="layer-list" role="listbox" :aria-activedescendant="'layer-' + activeIndex">
+    <ul
+      class="layer-list"
+      role="listbox"
+      :aria-activedescendant="'layer-' + activeIndex"
+    >
       <li
         v-for="(layer, index) in layers"
         :id="'layer-' + index"
@@ -79,15 +95,16 @@ function kindLabel(layer) {
         @drop="onDrop($event, index)"
         @click="emit('select', index)"
       >
-        <span class="kind-badge" :title="kindLabel(layer) === '图' ? '图片层' : '瓦片层'">{{
-          kindLabel(layer)
-        }}</span>
+        <span
+          class="kind-badge"
+          :title="kindLabel(layer) === '图' ? '图片层' : '瓦片层'"
+        >{{ kindLabel(layer) }}</span>
         <span class="layer-name" :title="layer.name">{{ layer.name }}</span>
         <label class="vis-toggle" :title="layer.visible ? '隐藏' : '显示'" @click.stop>
           <input
             type="checkbox"
             :checked="layer.visible"
-            @change="emit('toggle-visible', index, ($event.target).checked)"
+            @change="emit('toggle-visible', index, $event.target.checked)"
           />
           <span class="vis-label">{{ layer.visible ? '显' : '隐' }}</span>
         </label>
@@ -97,19 +114,43 @@ function kindLabel(layer) {
 </template>
 
 <style scoped>
-.dock {
-  width: 208px;
-  flex-shrink: 0;
+.dock--fill {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  min-height: 0;
+}
+.dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 .dock-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--win-text-secondary);
+  margin: 0;
+}
+.dock-collapse-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--win-border);
+  border-radius: 4px;
+  background: var(--win-surface);
+  color: var(--win-text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dock-collapse-btn:hover {
+  background: var(--win-hover);
 }
 .dock-actions {
   display: flex;

@@ -6,12 +6,25 @@ const props = defineProps({
   selectedId: { type: Number, required: true },
 })
 
+const emit = defineEmits(['collapse'])
+
 const block = computed(() => props.types.find((t) => t.id === props.selectedId) ?? null)
 </script>
 
 <template>
-  <aside class="dock win-panel">
-    <div class="dock-title">块定义</div>
+  <aside class="dock dock--fill win-panel" aria-label="块定义">
+    <div class="dock-head">
+      <div class="dock-title">块定义</div>
+      <button
+        type="button"
+        class="dock-collapse-btn"
+        title="折叠到右缘"
+        aria-label="折叠块定义停靠面板"
+        @click="emit('collapse')"
+      >
+        ⟩
+      </button>
+    </div>
     <div v-if="block" class="def-body">
       <div class="field">
         <span class="label">ID</span>
@@ -35,24 +48,52 @@ const block = computed(() => props.types.find((t) => t.id === props.selectedId) 
 </template>
 
 <style scoped>
-.dock {
-  width: 188px;
-  flex-shrink: 0;
+.dock--fill {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px;
 }
+.dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
 .dock-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--win-text-secondary);
+  margin: 0;
+}
+.dock-collapse-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--win-border);
+  border-radius: 4px;
+  background: var(--win-surface);
+  color: var(--win-text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dock-collapse-btn:hover {
+  background: var(--win-hover);
 }
 .def-body {
   display: flex;
   flex-direction: column;
   gap: 10px;
   font-size: 12px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
 }
 .field {
   display: grid;
